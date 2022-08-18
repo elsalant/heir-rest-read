@@ -154,16 +154,16 @@ if TEST:
 
 class SQLutils:
     def __init__(self):
-        sqlConnect = sqlite3.connect(DB_FILE)
-        cursor = sqlConnect.cursor()
-        return(sqlConnect, cursor)
+        self.sqlConnect = sqlite3.connect(DB_FILE)
+        self.cursor = self.sqlConnect.cursor()
+        return()
 
-    def buildSQLtableFromJson(self, sqlConnect, jsonInput, tableName):
+    def buildSQLtableFromJson(self, jsonInput, tableName):
         dict = flatten(json.loads(jsonInput))
         df = pd.json_normalize(dict)
         dataName = tableName+'Data'
-        df.to_sql(dataName, sqlConnect, if_exists="replace" )
-        sqlConnect.execute('create table ' + tableName + ' as select * from ' + dataName + ';')
+        df.to_sql(dataName, self.sqlConnect, if_exists="replace" )
+        self.sqlConnect.execute('create table ' + tableName + ' as select * from ' + dataName + ';')
         return()
 
     def querySQL(self, sqlConnect, strQuery):
@@ -236,3 +236,15 @@ class SQLutils:
                 parts = re.split(' AS ' ,element, flags=re.IGNORECASE)
                 aliasDict[parts[0].strip()] = parts[1].strip()
         return aliasDict
+
+    # super simplified translation of FHIR to SQL
+    # Either GET <server>/Observation
+    # GET <server>/Observation?<field>=<value>
+    def fhirToSQL(self, fhirQuery):
+        parsed = fhirQuery.split('?')
+        tableName = parsed[0]
+        sqlQuery = 'SELECT * FROM ' + tableName
+        if len(parsed) > 1:
+            searchParm = parsed[1]
+            sqlQuery += ' WHERE ' + searchParm
+        return(tableName, sqlQuery)

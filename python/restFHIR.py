@@ -20,6 +20,7 @@ import pandas as pd
 import os
 import re
 import base64
+from sqlUtils import SQLutils
 
 FLASK_PORT_NUM = 5559  # this application
 
@@ -57,6 +58,7 @@ time_window = os.getenv("HEIR_TIMEWINDOW") if os.getenv("HEIR_TIMEWINDOW") else 
 
 app = Flask(__name__)
 cmDict = {}
+sqlUtils = SQLutils()
 
 def handleQuery(queryGatewayURL, queryString, auth, params, method):
   #  print("querystring = " + queryString)
@@ -269,11 +271,15 @@ def apply_policy(jsonList, policies):
     # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
     # 1. Put the returned query results into an SQLite table
     # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
-    # 3. Reformulate the query based on the return from the Policy Manager to add the JOIN
-    # 4. Execute an SQL query on the this new query
-    # 5. Handle redactions
+    # 3. Translate the input FHIR query to SQL
+    # 4. Reformulate the query based on the return from the Policy Manager to add the JOIN
+    # 5. Execute an SQL query on the this new query
+    # 6. Handle redactions
     if action == 'JoinResource':
-        pass
+        whereclause = policy['transformations'][0]['whereclause']
+        joinclause = policy['transformations'][0]['joinStatement']
+        joinTable = policy['transformations'][0]['joinTable']
+        SQLutils.buildSQLtableFromJson(jsonList,'Observation')
 
     if action == 'Statistics':
         for col in policy['transformations'][0]['columns']:
