@@ -1,0 +1,21 @@
+apiVersion: app.fybrik.io/v1alpha1
+kind: FybrikApplication
+metadata:
+  name: fhirnotebook
+  namespace: rest-fhir
+  labels:
+    app: read-fhir-app
+    requestedBy: EliotSalant
+spec:
+  selector: 
+    workloadSelector:
+      matchLabels:  
+        app: fhirnotebook 
+  appInfo:
+   intent: research
+  data:
+    - dataSetID: "rest-fhir/observation-json"
+      requirements:
+        interface: 
+          protocol: fhir
+          dataformat: json

@@ -1,0 +1,42 @@
+# Copyright 2020 IBM Corp.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: app.fybrik.io/v1alpha1
+kind: FybrikModule
+metadata:
+  name: resttofhir
+  namespace: fybrik-system
+  labels:
+    name: RESTToFHIR
+    version: 0.1.0 
+spec:
+  type:  service  
+  capabilities:
+    - capability: read
+      actions:
+        - name: RedactColumn
+        - name: Statistics
+        - name: BlockResource
+        - name: ReturnIntent
+      api:
+        connection:
+          name: fhir
+          fhir:
+            fhirServer: ibmfhir
+            port: 9443
+        dataFormat: json
+      supportedInterfaces:
+        - source:
+            protocol: fhir
+            dataformat: json
+  chart:
+    name: ghcr.io/fybrik/fhir-read-chart:0.0.1
+    values:
+      image.tag: 0.0.1
+  statusIndicators:
+    - kind: StreamTransfer
+      successCondition: status.status == SUCCEEDED
+      failureCondition: status.status == FAILED
+      errorMessage: status.error
+

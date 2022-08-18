@@ -1,0 +1,54 @@
+{{- if .Values.read -}}
+data:
+    {{- if .Values.read.source.connection.kafka }}
+      WP2_TOPIC: {{ .Values.read.source.connection.kafka.topic_name }}
+      HEIR_KAFKA_HOST: {{ .Values.read.source.connection.kafka.bootstrap_servers }}  
+    {{- end }}
+    {{- if .Values.read.transformations }}
+    transformations:
+    {{- $redactColumns := list -}}
+    {{- $statisticsColumn := list -}}
+    {{- $removeColumns := list -}}
+    {{- range .Values.read.transformations -}}
+      {{- if eq .name "RemoveColumn" -}}
+        {{- $removeColumns = .RemoveColumn.columns -}}
+      {{- end -}}
+      {{- if eq .name "Statistics" -}}
+        {{- $statisticsColumn = .Statistics.columns -}}
+      {{- end -}}
+      {{- if eq .name "RedactColumn" -}}
+        {{- $redactColumns = .RedactColumn.columns -}}
+      {{- end -}}
+    {{- end -}}  # range
+####
+# RemoveColumn
+    {{- if .Values.read.transformations.RemoveColumn -}}
+      - action: "RemoveColumn"
+        description: "remove columns: {{ $removeColumns -}}"
+        columns:
+          {{- range $removeColumns}}
+          - {{ . }}
+          {{- end }}
+    {{- end}}  # .Values.read.transformations.RemoveColumn
+# RedactColumn
+    {{- if .Values.read.transformations.RedactColumn }}
+      - action: "RedactColumn"
+        description: "redact columns: {{ $redactColumns }}"
+        columns:
+          {{- range $redactColumns}}
+          - {{ . }}
+          {{- end }}
+        options:
+          redactValue: "XXXXX"
+    {{- end}}  # .Values.read.transformations.RedactColumn
+# Statistics
+    {{- if .Values.read.transformations.Statistics }}
+      - action: "Statistics"
+        description: "Perform statistical analysis on: {{ $statisticsColumn }}"
+        columns:
+          {{- range $statisticsColumn}}
+          - {{ . }}
+          {{- end }}
+    {{- end}} # .Values.read.transformations.Statistics
+    {{- end }}  # if .Values.read.transformations
+{{- end -}}

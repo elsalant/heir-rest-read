@@ -1,0 +1,26 @@
+apiVersion: katalog.fybrik.io/v1alpha1
+kind: Asset
+metadata:
+  name: observation-json
+  namespace: rest-fhir
+spec:
+  details:
+    dataFormat: json
+    connection:
+      name: fhir
+      fhir:
+        fhirServer: ibmfhir
+        port: 9443
+        namespace: rest-fhir
+        secretRef: fhir-credentials
+  secretRef:
+      name: fhir-credentials
+  metadata:
+    name: FHIR server
+    geography: UK
+    tags:
+      healthcare: true
+    columns:
+      - name: Observation
+        tags:
+          blocked: true
