@@ -1,12 +1,9 @@
 import pandas as pd
 import json
-import io
 import sqlite3
 from flatten_json import flatten
 import sqlparse
 import re
-
-joinAdded = False
 
 TEST = False
 if TEST:
@@ -178,8 +175,10 @@ class SQLutils:
 
 # returns the reformulated query and a dictionary of original column names with their aliases in the event
 # redaction is required
+# For now, for HEIR where the queries are translated from FHIR, the original query cannot contain a JOIN
     def reformulateQuery(self, origQuery, extraWhere, extraJoins):
-        global joinAdded
+        joinAdded = False
+        whereAdded =  False
         # Run through the query.  Keep the SELECT and FROM clauses as-is.
         # JOIN..ON needs to be supplemented with whatever is passed as an extraJoin
         # WHERE (which does not appear as a keyword) needs to be supplemented by the extraWhere
@@ -194,22 +193,25 @@ class SQLutils:
                 rebuiltQuery += token.value
       #          rebuiltQuery += modifyJoin(origQuery, extraJoins)
             elif re.search('where', token.value, re.IGNORECASE):  # first add the extraWhere, stripping out "WHERE" in original token
+                    rebuiltQuery += '\n'+extraJoins + '\n'
                     if extraWhere:
-                        rebuiltQuery += 'WHERE ' + extraWhere + ' AND ' + re.sub('where', '', token.value, flags=re.IGNORECASE)
+                        rebuiltQuery += extraWhere + ' AND ' + re.sub('where', '', token.value, flags=re.IGNORECASE)
                     else:
                         rebuiltQuery += token.value
             else:
-                rebuiltQuery += token.value
+                rebuiltQuery += '\n' + extraJoins + '\n' +token.value
+        if whereAdded == False:
+            rebuiltQuery += extraWhere
 
         # Now, check to see if the SELECT clause used any aliases (i.e. "AS")
         selectQuery = self.getSelectCondition(origQuery)
         if selectQuery:
-            aliasDict = getSubstitutions(selectQuery)
+            aliasDict = self.getSubstitutions(selectQuery)
         return rebuiltQuery, aliasDict
 
     def getSelectCondition(self, origQuery):
         tokens = sqlparse.parse(origQuery)[0]
-        #Get the "SELECT" statement and see if there are any "AS" subsitutions
+        # Get the "SELECT" statement and see if there are any "AS" subsitutions
         index = 0
         selectClause = ''
         for token in tokens:

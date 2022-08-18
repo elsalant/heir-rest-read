@@ -20,8 +20,7 @@ rule[{"action": {"name":"BlockResource", "columns": column_names}, "policy": des
   count(column_names) > 0
 }
 
-rule[{"name": "Block records if no consent given", "action": "FilterPred", "token" : "organization", "filterPredicate" :
-"WHERE organisation.label = '**T1**'", "replaceMe": "**T1**"}]  {
-    input.request.asset.name == "videos"
-    not contains(input.request.role, "Admin")
-    not contains(input.request.role, "Manager")
+rule[{"name": "Perform a JOIN with the Consent resource", "action": "JoinResource", "joinTable" : "Consent",
+"whereclause" : " WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP'", "joinStatement" : " JOIN consent ON observation.subject_reference = consent.patient_reference "}]  {
+    1 == 1
+}
