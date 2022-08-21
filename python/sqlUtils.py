@@ -169,9 +169,13 @@ class SQLutils:
         return()
 
     def querySQL(self, strQuery):
+        print('Final query = ' + strQuery)
         self.cursor.execute(strQuery)
         rows = self.cursor.fetchall()
-        return rows
+        # print things up a bit
+        r = [dict((self.cursor.description[i][0], value) \
+                  for i, value in enumerate(row)) for row in rows]
+        return r
 
     def dropTable(self, sqlConnect, tableName):
         sqlConnect.execute('DROP TABLE IF EXISTS ' + tableName + ';')
