@@ -2,6 +2,7 @@
 # Copyright 2022 IBM Corp.
 # SPDX-License-Identifier: Apache-2.0
 #
+import logging
 
 from flask import Flask, request
 from kubernetes import client, config
@@ -29,7 +30,8 @@ ERROR_CODE = 406
 BLOCK_CODE = 501
 VALID_RETURN = 200
 
-TEST = False   # allows testing outside of Fybrik/Kubernetes environment
+TEST = True   # allows testing outside of Fybrik/Kubernetes environment
+logger = logging.getLogger(__name__)
 
 if TEST:
     DEFAULT_FHIR_HOST = 'https://localhost:9443/fhir-server/api/v4/'
@@ -194,7 +196,8 @@ def connect_to_kafka():
     return(producer)
 
 # Pass in the data to be redacted as jsonList, along with the redaction policies
-def apply_policy(jsonList, policies):
+# origFHIR is required if we are doing a JOIN, as we need to translate this to SQL
+def apply_policy(jsonList, policies, origFHIR):
     df = pd.json_normalize(jsonList)
     redactedData = []
     # Redact df based on policy returned from the policy manager
@@ -273,13 +276,28 @@ def apply_policy(jsonList, policies):
     # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
     # 3. Translate the input FHIR query to SQL
     # 4. Reformulate the query based on the return from the Policy Manager to add the JOIN
-    # 5. Execute an SQL query on the this new query
+    # 5. Execute an SQL query on this new query
     # 6. Handle redactions
     if action == 'JoinResource':
         whereclause = policy['transformations'][0]['whereclause']
         joinclause = policy['transformations'][0]['joinStatement']
         joinTable = policy['transformations'][0]['joinTable']
-        SQLutils.buildSQLtableFromJson(jsonList,'Observation')
+        # Give the name the same name as the requested resource
+        tableName = df['resourceType'][0]
+        logger.info('building table of name' + tableName)
+        sqlUtils.buildSQLtableFromJson(jsonList,'Observation')
+        # Call in to FHIR to get the join resource values, and put the results into a table.
+        # The passed 'joinTable' value must be the name of the FHIR resource
+        joinQuery = joinTable
+        joinJSON = read_from_fhir(joinQuery)
+        logger.info('building JOIN table of name' + joinTable)
+        sqlUtils.buildSQLtableFromJson(joinJSON[0], joinTable)
+        # Translate the original FHIHR query to SQL and then reformulate for the JOIN.
+        # No need to do anything with the returned aliasDict, since the original query is FHIR without aliasing
+        origSQL = sqlUtils.fhirToSQL(origFHIR)
+        joinQuery, aliasDict = sqlUtils.reformulateQuery(origSQL, whereclause, joinclause)
+        joinedJSON = sqlUtils.querySQL(joinQuery)
+        return (joinedJSON, VALID_RETURN)
 
     if action == 'Statistics':
         for col in policy['transformations'][0]['columns']:
@@ -372,7 +390,11 @@ def getAll(queryString=None):
     timeOut = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     # Hack for testing without JWT
     queryRequester = role if noJWT else givenName+surName
-    assetID = cmDict['assetID']
+    # assetID is used for logging only and may not be supplied
+    if 'assetID' in cmDict:
+        assetID = cmDict['assetID']
+    else:
+        assetID = __name__
     intent = 'Not given'
     for i in cmDict['transformations']:
         if 'intent' in i:
@@ -393,7 +415,7 @@ def getAll(queryString=None):
     if (messageCode != VALID_RETURN):
         return ("{\"Error\": \"No information returned!\"}")
 #apply_policies
-    ans, messageCode = apply_policy(dfBack, cmDict)
+    ans, messageCode = apply_policy(dfBack, cmDict, queryString)
     if messageCode == VALID_RETURN:
         outcome = "AUTHORIZED"
     elif messageCode == BLOCK_CODE:
@@ -448,10 +470,13 @@ def main():
         print('cmReturn = ', cmReturn)
     if TEST:
         cmDict = {'dict_item': [
-            ('transformations', [{'action': 'BlockResource', 'description': 'redact columns: [valueQuantity.value id]',
-            'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}},
-            {'action': 'ReturnIntent', 'description': 'return intent',
-            'columns': ['N/A'], 'intent': 'research'}]), ('assetID', 'sql-fhir/observation-json')]}
+            ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
+                                  'joinTable': 'Consent',
+                                  'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
+                                  'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '}])]}
+
+   #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
+   #             'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
         cmDict = dict(cmDict['dict_item'])
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
    #          'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
@@ -459,6 +484,11 @@ def main():
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: ',
    #                                               'columns': ['valueQuantity.value','subject.display', 'text.div', 'subject.reference'],
    #                                               'options': {'redactValue': 'XXXXX'}}])]}
+   # cmDict = {'dict_item': [
+   #     ('transformations', [{'action': 'BlockResource', 'description': 'redact columns: [valueQuantity.value id]',
+   #                           'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}},
+   #                          {'action': 'ReturnIntent', 'description': 'return intent',
+   #                           'columns': ['N/A'], 'intent': 'research'}]), ('assetID', 'sql-fhir/observation-json')]}
  #      cmDict = {'dict_item': [('WP2_TOPIC', 'fhir-wp2'), ('HEIR_KAFKA_HOST', 'kafka.fybrik-system:9092'),('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: [id valueQuantity.value]', 'columns': ['id', 'valueQuantity.value'], 'options': {'redactValue': 'XXXXX'}}, {'action': 'Statistics', 'description': 'statistics on columns: [valueQuantity.value]', 'columns': ['valueQuantity.value']}])]}
   #      cmDict = {'dict_items': [('WP2_TOPIC', 'fhir-wp2'), ('HEIR_KAFKA_HOST', 'kafka.fybrik-system:9092'), ('VAULT_SECRET_PATH', None), ('SECRET_NSPACE', 'fybrik-system'), ('SECRET_FNAME', 'credentials-els'), ('S3_URL', 'http://s3.eu.cloud-object-storage.appdomain.cloud'), ('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: [id valueQuantity.value]', 'columns': ['id', 'valueQuantity.value'], 'options': {'redactValue': 'XXXXX'}}, {'action': 'Statistics', 'description': 'statistics on columns: [valueQuantity.value]', 'columns': ['valueQuantity.value']}])]}
     else:

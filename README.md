@@ -19,6 +19,8 @@ Do once:  make sure helm v3.7+ is installed
 2. Install fybrik from the instructions in: https://fybrik.io/v0.6/get-started/quickstart/
 3. Start the IBM FHIR server service (out-of-box version):   
 helm install ibmfhir oci://ghcr.io/elsalant/ibmfhir_orig --version=0.2.0 -n fybrik-system
+(If running in testing mode outside of k8s then:
+docker run -p 9443:9443 -e BOOTSTRAP_DB=true ibmcom/ibm-fhir-server )
 4. Start the Kafka server:  
    - helm install kafka bitnami/kafka -n fybrik-system  
    - Note that if the Kafka server needs to be exposed externally to the k8s cluster then instead do the following:

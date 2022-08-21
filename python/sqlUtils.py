@@ -154,20 +154,24 @@ if TEST:
 
 class SQLutils:
     def __init__(self):
-        self.sqlConnect = sqlite3.connect(DB_FILE)
+        self.sqlConnect = sqlite3.connect(DB_FILE, check_same_thread=False)
         self.cursor = self.sqlConnect.cursor()
-        return()
+        return(None)
 
-    def buildSQLtableFromJson(self, jsonInput, tableName):
-        dict = flatten(json.loads(jsonInput))
-        df = pd.json_normalize(dict)
+    def buildSQLtableFromJson(self, jsonListInput, tableName):
+        flattenedJsonList = [flatten(i) for i in jsonListInput]
+        df = pd.DataFrame(flattenedJsonList)
+ #       df = pd.json_normalize(dict)
         dataName = tableName+'Data'
         df.to_sql(dataName, self.sqlConnect, if_exists="replace" )
+        self.dropTable(self.sqlConnect, tableName)
         self.sqlConnect.execute('create table ' + tableName + ' as select * from ' + dataName + ';')
         return()
 
-    def querySQL(self, sqlConnect, strQuery):
-        return(sqlConnect.execute(strQuery))
+    def querySQL(self, strQuery):
+        self.cursor.execute(strQuery)
+        rows = self.cursor.fetchall()
+        return rows
 
     def dropTable(self, sqlConnect, tableName):
         sqlConnect.execute('DROP TABLE IF EXISTS ' + tableName + ';')
@@ -183,7 +187,7 @@ class SQLutils:
         # JOIN..ON needs to be supplemented with whatever is passed as an extraJoin
         # WHERE (which does not appear as a keyword) needs to be supplemented by the extraWhere
         rebuiltQuery = ''
-        tokens = sqlparse.parse(origQuery)[0]
+        tokens = sqlparse.parse(origQuery[1])[0]
         for index in range(0, len(tokens.tokens)):
             token = tokens[index]
             if token.is_keyword and token.value.casefold() == 'JOIN'.casefold() and joinAdded == False:
@@ -199,7 +203,9 @@ class SQLutils:
                     else:
                         rebuiltQuery += token.value
             else:
-                rebuiltQuery += '\n' + extraJoins + '\n' +token.value
+                rebuiltQuery += token.value
+        if joinAdded == False:
+            rebuiltQuery += extraJoins
         if whereAdded == False:
             rebuiltQuery += extraWhere
 
@@ -210,7 +216,7 @@ class SQLutils:
         return rebuiltQuery, aliasDict
 
     def getSelectCondition(self, origQuery):
-        tokens = sqlparse.parse(origQuery)[0]
+        tokens = sqlparse.parse(origQuery[1])[0]
         # Get the "SELECT" statement and see if there are any "AS" subsitutions
         index = 0
         selectClause = ''
@@ -228,7 +234,7 @@ class SQLutils:
 
 
     #Returns a dictionary of original column names and their aliases.  Note that
-    def getSubstitutions(selectClause):
+    def getSubstitutions(self, selectClause):
         splitClause = selectClause.split(',')
         aliasDict = {}  # dictionary of aliases
         for element in splitClause:
