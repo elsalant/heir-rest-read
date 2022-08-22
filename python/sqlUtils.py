@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 import sqlite3
-from flatten_json import flatten
+from flatten_json import flatten, unflatten_list
 import sqlparse
 import re
 
@@ -172,10 +172,15 @@ class SQLutils:
         print('Final query = ' + strQuery)
         self.cursor.execute(strQuery)
         rows = self.cursor.fetchall()
-        # print things up a bit
+        # pretty things up a bit
         r = [dict((self.cursor.description[i][0], value) \
                   for i, value in enumerate(row)) for row in rows]
-        return r
+        # In order to return the original JSON structure
+        cleanDict = r[0]
+        cleanDict.pop('index')
+ #       returnJson = json.dumps(unflatten_list(cleanDict))
+        return unflatten_list(cleanDict)
+#        return r
 
     def dropTable(self, sqlConnect, tableName):
         sqlConnect.execute('DROP TABLE IF EXISTS ' + tableName + ';')
