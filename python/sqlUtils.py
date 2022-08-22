@@ -253,7 +253,7 @@ class SQLutils:
     def fhirToSQL(self, fhirQuery):
         parsed = fhirQuery.split('?')
         tableName = parsed[0]
-        sqlQuery = 'SELECT * FROM ' + tableName
+        sqlQuery = 'SELECT ' + tableName + '.* FROM ' + tableName
         if len(parsed) > 1:
             searchParm = parsed[1]
             sqlQuery += ' WHERE ' + searchParm
