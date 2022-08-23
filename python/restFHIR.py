@@ -206,136 +206,143 @@ def apply_policy(jsonList, policies, origFHIR):
     std = ''
    # cleanPatientId = df['subject.reference'][0].replace('/', '-')
     print('inside apply_policy. Length policies = ', str(len(policies)), " type(policies) = ", str(type(policies)))
-#    for policy in policies:
-    policy = policies
-    print('policy = ', str(policy))
-    if policy['transformations'][0] == None:
+    if len(policies['transformations']) == 0:
         print('No transformations found!')
         return (str(df.to_json()))
-    action = policy['transformations'][0]['action']
-    if action == '':
-        return (str(df.to_json()), VALID_RETURN)
-    print('Action = ' + action)
+    # There can be a number of policies that need to be applied.  If we have a JOIN, this needs to be done
+    # first, before the the redaction.  In that case, the case, the data returned by the JOIN needs to have the
+    # redaction applied to it.  Make sure that the JoinResource actions is the first in the list
+    if len(policies['transformations']) > 1:
+        for index, value in enumerate(policies['transformations']):
+            if policies['transformations'][index]['action'] == 'JoinResource':
+                policies['transformations'] = [policies['transformations'][index]] + policies['transformations']
+                policies['transformations'].pop(index+1)
+                break
+    for policy in policies['transformations']:
+        action = policy['action']
+        if action == '':
+            return (str(df.to_json()), VALID_RETURN)
+        print('Action = ' + action)
 
-# Allow specifying a particular attribute for a given resource by specifying the in policy file the
-# the column name as <resource>.<column_name>
-    dfToRows = []
-    if action == 'DeleteColumn':
-        try:
-            for col in policy['transformations'][0]['columns']:
+    # Allow specifying a particular attribute for a given resource by specifying the in policy file the
+    # the column name as <resource>.<column_name>
+        dfToRows = []
+        if action == 'DeleteColumn':
+            try:
+                for col in policy['columns']:
+                    if '.' in col:
+                        (resource, col) = col.split('.')
+                        print("resource, attribute specified: " + resource + ", " + col)
+                        if (df['resourceType'][0]) != resource:
+                            continue
+                    df.drop(col, inplace=True, axis=1)
+            except:
+                print("No such column " + col + " to delete")
+            for i in df.index:
+                jsonList = [json.loads(x) for x in dfToRows]
+            return (jsonList, VALID_RETURN)
+
+        if action == 'RedactColumn':
+            replacementStr = policy['options']['redactValue']
+            for col in policy['columns']:
                 if '.' in col:
-                    (resource, col) = col.split('.')
-                    print("resource, attribute specified: " + resource + ", " + col)
-                    if (df['resourceType'][0]) != resource:
-                        continue
-                df.drop(col, inplace=True, axis=1)
-        except:
-            print("No such column " + col + " to delete")
-        for i in df.index:
-  #        dfToRows = dfToRows + df.loc[i].to_json()
+    # We can either be passing something of the form:  resource.attribute, or attribute, where attribute
+    # itself may contain a '.'.  Take the result of the first split and see if that is equal to resourceType to differentiate
+                    (resourceCandidate, colCandidate) = col.split('.',1)
+                    if resourceCandidate == df['resourceType'][0]:
+                        col = colCandidate
+                    print("resource, attribute specified: " + resourceCandidate + ", " + col)
+                try:
+        # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
+        # before replacing
+      #              df[col].replace(r'.+', replacementStr, regex=True, inplace=True)
+                    df[col]= df[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
+                except:
+                    print("No such column " + col + " to redact")
+            for i in df.index:
+                dfToRows.append(df.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
-        return (jsonList, VALID_RETURN)
- #       redactedData.append(dfToRows)
- #       return(str(redactedData))
+            return (jsonList, VALID_RETURN)
 
-    if action == 'RedactColumn':
-        replacementStr = policy['transformations'][0]['options']['redactValue']
-        for col in policy['transformations'][0]['columns']:
-            if '.' in col:
-# We can either be passing something of the form:  resource.attribute, or attribute, where attribute
-# itself may contain a '.'.  Take the result of the first split and see if that is equal to resourceType to differentiate
-                (resourceCandidate, colCandidate) = col.split('.',1)
-                if resourceCandidate == df['resourceType'][0]:
-                    col = colCandidate
-                print("resource, attribute specified: " + resourceCandidate + ", " + col)
+        if action == 'BlockResource':
+        #    if policy['transformations'][0]['columns'][0] == df['resourceType'][0]:
+            if df['resourceType'][0] in policy['columns']:
+                return('{"result": "Resource blocked by policy!!"}', BLOCK_CODE)
+            else:
+                print('No resource to block!. resourceType =  ' + df['resourceType'][0] + \
+                      ' policy[\'columns\'][0] = ' + df['resourceType'][0] in policy['columns'][0])
+                return(str(df.to_json()), VALID_RETURN)
+        # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
+        # 1. Put the returned query results into an SQLite table
+        # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
+        # 3. Translate the input FHIR query to SQL
+        # 4. Reformulate the query based on the return from the Policy Manager to add the JOIN
+        # 5. Execute an SQL query on this new query
+        # 6. Handle redactions
+        if action == 'JoinResource':
+            whereclause = policy['whereclause']
+            joinclause = policy['joinStatement']
+            joinTable = policy['joinTable']
+            # Give the name the same name as the requested resource
+            tableName = df['resourceType'][0]
+            logger.info('building table of name' + tableName)
+            sqlUtils.buildSQLtableFromJson(jsonList,'Observation')
+            # Call in to FHIR to get the join resource values, and put the results into a table.
+            # The passed 'joinTable' value must be the name of the FHIR resource
+            joinQuery = joinTable
+            joinJSON = read_from_fhir(joinQuery)
+            logger.info('building JOIN table of name' + joinTable)
+            sqlUtils.buildSQLtableFromJson(joinJSON[0], joinTable)
+            # Translate the original FHIHR query to SQL and then reformulate for the JOIN.
+            # No need to do anything with the returned aliasDict, since the original query is FHIR without aliasing
+            origSQL = sqlUtils.fhirToSQL(origFHIR)
+            joinQuery, aliasDict = sqlUtils.reformulateQuery(origSQL, whereclause, joinclause)
+            joinedJSON = sqlUtils.querySQL(joinQuery)
+            # If we still have other transformation actions to handle - i.e. more than one transform in policies,
+            #  reset the original df and continue
+            if len(policies['transformations']) > 1:
+                df = pd.json_normalize(joinedJSON)
+                continue
+            else:
+                return (joinedJSON, VALID_RETURN)
+
+        if action == 'Statistics':
+            for col in policy['columns']:
+                print('col = ', col)
+                try:
+                    std = df[col].std()
+                except:
+                    print('No col ' + col + ' found!')
+                    print(df.keys())
+                stdStr = '{\"CGM_STD\": \"' + str(std) + '\"}'
+                mean = df[col].mean()
+                meanStr = '{\"CGM_MEAN\": \"' + str(mean) + '\"}'
+            redactedData.append(meanStr+ ' ' + stdStr)
+    # Calculate Time in Range, Time Above Range, Time Below Range
+            numObservations = len(df)
             try:
-    # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
-    # before replacing
-  #              df[col].replace(r'.+', replacementStr, regex=True, inplace=True)
-                df[col]= df[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
+                high_threshold = df['referenceRange'][0][0]['high']['value']
+                print('high_threshold found in resource as ' + str(high_threshold))
             except:
-                print("No such column " + col + " to redact")
-        for i in df.index:
- #           dfToRows = dfToRows + df.loc[i].to_json()
-            dfToRows.append(df.loc[i].to_json())
-        jsonList = [json.loads(x) for x in dfToRows]
-        return (jsonList, VALID_RETURN)
-    #    redactedData.append(dfToRows)
-    #    return(str(redactedData))
-
-    if action == 'BlockResource':
-    #    if policy['transformations'][0]['columns'][0] == df['resourceType'][0]:
-        if df['resourceType'][0] in policy['transformations'][0]['columns']:
-            return('{"result": "Resource blocked by policy!!"}', BLOCK_CODE)
-        else:
-            print('No resource to block!. resourceType =  ' + df['resourceType'][0] + \
-                  ' policy[\'transformations\'][0][\'columns\'][0] = ' + df['resourceType'][0] in policy['transformations'][0]['columns'][0])
-            return(str(df.to_json()), VALID_RETURN)
-    # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
-    # 1. Put the returned query results into an SQLite table
-    # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
-    # 3. Translate the input FHIR query to SQL
-    # 4. Reformulate the query based on the return from the Policy Manager to add the JOIN
-    # 5. Execute an SQL query on this new query
-    # 6. Handle redactions
-    if action == 'JoinResource':
-        whereclause = policy['transformations'][0]['whereclause']
-        joinclause = policy['transformations'][0]['joinStatement']
-        joinTable = policy['transformations'][0]['joinTable']
-        # Give the name the same name as the requested resource
-        tableName = df['resourceType'][0]
-        logger.info('building table of name' + tableName)
-        sqlUtils.buildSQLtableFromJson(jsonList,'Observation')
-        # Call in to FHIR to get the join resource values, and put the results into a table.
-        # The passed 'joinTable' value must be the name of the FHIR resource
-        joinQuery = joinTable
-        joinJSON = read_from_fhir(joinQuery)
-        logger.info('building JOIN table of name' + joinTable)
-        sqlUtils.buildSQLtableFromJson(joinJSON[0], joinTable)
-        # Translate the original FHIHR query to SQL and then reformulate for the JOIN.
-        # No need to do anything with the returned aliasDict, since the original query is FHIR without aliasing
-        origSQL = sqlUtils.fhirToSQL(origFHIR)
-        joinQuery, aliasDict = sqlUtils.reformulateQuery(origSQL, whereclause, joinclause)
-        joinedJSON = sqlUtils.querySQL(joinQuery)
-        return (joinedJSON, VALID_RETURN)
-
-    if action == 'Statistics':
-        for col in policy['transformations'][0]['columns']:
-            print('col = ', col)
+                high_threshold = HIGH_THRESHOLD_DEFAULT
             try:
-                std = df[col].std()
+                low_threshold = df['referenceRange'][0][0]['low']['value']
+                print('low_threshold found in resource as ' + str(low_threshold))
             except:
-                print('No col ' + col + ' found!')
-                print(df.keys())
-            stdStr = '{\"CGM_STD\": \"' + str(std) + '\"}'
-            mean = df[col].mean()
-            meanStr = '{\"CGM_MEAN\": \"' + str(mean) + '\"}'
-        redactedData.append(meanStr+ ' ' + stdStr)
-# Calculate Time in Range, Time Above Range, Time Below Range
-        numObservations = len(df)
-        try:
-            high_threshold = df['referenceRange'][0][0]['high']['value']
-            print('high_threshold found in resource as ' + str(high_threshold))
-        except:
-            high_threshold = HIGH_THRESHOLD_DEFAULT
-        try:
-            low_threshold = df['referenceRange'][0][0]['low']['value']
-            print('low_threshold found in resource as ' + str(low_threshold))
-        except:
-            low_threshold = LOW_THRESHOLD_DEFAULT
-        tar = round((len(df.loc[df[col]>high_threshold,col])/numObservations)*100)
-        tbr = round((len(df.loc[df[col]<low_threshold,col])/numObservations)*100)
-        tir = 100 - tar - tbr
-        d = {
-            'PATIENT_ID': df['subject.reference'][0],
-            'CGM_TIR': tir,
-            'CGM_TAR': tar,
-            'CGM_TBR': tbr,
-            'CGM_MEAN': mean,
-            'CGM_STD': std
-        }
-        return(str(d), VALID_RETURN)
-    return('{"Unknown transformation": "'+ action + '"}', ERROR_CODE)
+                low_threshold = LOW_THRESHOLD_DEFAULT
+            tar = round((len(df.loc[df[col]>high_threshold,col])/numObservations)*100)
+            tbr = round((len(df.loc[df[col]<low_threshold,col])/numObservations)*100)
+            tir = 100 - tar - tbr
+            d = {
+                'PATIENT_ID': df['subject.reference'][0],
+                'CGM_TIR': tir,
+                'CGM_TAR': tar,
+                'CGM_TBR': tbr,
+                'CGM_MEAN': mean,
+                'CGM_STD': std
+            }
+            return(str(d), VALID_RETURN)
+        return('{"Unknown transformation": "'+ action + '"}', ERROR_CODE)
 
 def timeWindow_filter(df):
     print("keys = ", df.keys())
@@ -469,12 +476,20 @@ def main():
             raise ValueError('Error reading from file! ' + CM_PATH)
         print('cmReturn = ', cmReturn)
     if TEST:
+ #       cmDict = {'dict_item': [
+ #           ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
+ #                                 'joinTable': 'Consent',
+ #                                 'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
+ #                                 'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '}])]}
         cmDict = {'dict_item': [
             ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
                                   'joinTable': 'Consent',
                                   'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
-                                  'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '}])]}
-
+                                  'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '},
+                                 {'action': 'RedactColumn', 'description': 'Redact PII fields',
+                                  'joinTable': 'Consent',
+                                  'columns': ['valueQuantity.value','subject.display', 'text.div', 'subject.reference'],
+                                                  'options': {'redactValue': 'XXXXX'}}])]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
    #             'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
         cmDict = dict(cmDict['dict_item'])
