@@ -10,7 +10,7 @@ data:
   {{- end }}
   {{- if .source.connection.fhir }}
    SECRET_NSPACE: {{ .source.connection.fhir.namespace }}
-   SECRET_FNAME: {{ .source.connection.fhir.secretRef }}
+   SECRET_FNAME: {{ .source.connection.fhir.secret_file }}
   {{- end }}
   {{- if .assetID }}
    assetID: {{ .assetID }}
