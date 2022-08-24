@@ -30,7 +30,7 @@ ERROR_CODE = 406
 BLOCK_CODE = 501
 VALID_RETURN = 200
 
-TEST = True   # allows testing outside of Fybrik/Kubernetes environment
+TEST = False   # allows testing outside of Fybrik/Kubernetes environment
 logger = logging.getLogger(__name__)
 
 if TEST:
@@ -206,6 +206,7 @@ def apply_policy(jsonList, policies, origFHIR):
     std = ''
    # cleanPatientId = df['subject.reference'][0].replace('/', '-')
     print('inside apply_policy. Length policies = ', str(len(policies)), " type(policies) = ", str(type(policies)))
+    print(policies)
     if len(policies['transformations']) == 0:
         print('No transformations found!')
         return (str(df.to_json()))

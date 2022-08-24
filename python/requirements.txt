@@ -8,6 +8,7 @@ cryptography==3.4.6
 curlify==2.2.1
 Flask==1.1.2
 Flask-RESTful==0.3.8
+flatten-json==0.1.13
 idna==3.2
 itsdangerous==2.0.1
 jinja2<3.1
@@ -24,6 +25,7 @@ ruamel.yaml==0.16.12
 s3fs==2021.8.0
 s3transfer
 six==1.16.0
+sqlparse==0.4.2
 typing-extensions==3.10.0.0
 urllib3==1.26.6
 werkzeug==2.0.3 

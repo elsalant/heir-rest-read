@@ -2,6 +2,7 @@
 FROM python:3.8-slim
 
 WORKDIR /app
+COPY sqlUtils.py sqlUtils.py
 COPY restFHIR.py restFHIR.py
 COPY requirements.txt requirements.txt
 RUN apt-get update && apt-get install -y musl-dev python3-dev gcc

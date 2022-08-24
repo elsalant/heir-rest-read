@@ -16,7 +16,7 @@ Do once:  make sure helm v3.7+ is installed
 > helm version
 
 1. export HELM_EXPERIMENTAL_OCI=1
-2. Install fybrik from the instructions in: https://fybrik.io/v0.6/get-started/quickstart/
+2. Install fybrik from the instructions in: https://fybrik.io/dev/get-started/quickstart/
 3. Start the IBM FHIR server service (out-of-box version):   
 helm install ibmfhir oci://ghcr.io/elsalant/ibmfhir_orig --version=0.2.0 -n fybrik-system
 (If running in testing mode outside of k8s then:
@@ -33,22 +33,29 @@ kubectl create namespace rest-fhir
 6. Pull the files:  
 git pull https://github.com/fybrik/REST-read-example.git  
 7. Install the policy:  
-\<ROOT>/scripts/applyPolicy.sh  
+cd \<INSTALLATION ROOT>
+scripts/applyPolicy.sh  
 8. Apply the FHIR server secrets and permissions  
-\<ROOT>/scripts/deployPermissions.sh  
-9. kubectl apply -f \<ROOT>/asset.yaml  
+scripts/deployPermissions.sh  
+9. kubectl apply -f asset.yaml  
 10. Apply the module  
-kubectl apply -f \<ROOT>/restFHIRmodule.yaml  
+kubectl apply -f restFHIRmodule.yaml  
 11. Apply the application - note that the name (or JWT) for the requester is in the label.requestedBy field!  
-kubectl apply -f \<ROOT>/restFHIRapplication.yaml  
+kubectl apply -f restFHIRapplication.yaml  
 12. Test  
-- a) Load database  
+- a) Load the FHIR server  
 kubectl port-forward svc/ibmfhir -n fybrik-system 9443:9443  
-\<ROOT>/scripts/createPatient.sh  
+scripts/createConsent.sh
+scripts/createConsent1.sh
+scripts/createObservation.sh
+
 - b) Port-forward pod in fybrik-blueprints  
  kubectl get pods -n fybrik-blueprints  
 eg: kubectl port-forward pod/\<POD ID> -n fybrik-blueprints 5559:5559  
-- c) curl -X GET -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJIRUlSIHRlc3QiLCJpYXQiOjE2NDM2MTQ3NzQsImV4cCI6MTczODMwOTIwNCwiYXVkIjoiTk9LTFVTIiwic3ViIjoiaGVpci13cDItdGVzdCIsIkdpdmVuTmFtZSI6IkVsaW90IiwiU3VybmFtZSI6IlNhbGFudCIsIkVtYWlsIjoic2FsYW50QGlsLmlibS5jb20iLCJSb2xlIjpbIk1hbmFnZXIiLCJQcm9qZWN0IEFkbWluaXN0cmF0b3IiXX0.WxBSdu7xe9LIsu_MlzX3spmvQmQpRm8MFK0d19eW_no" http://localhost:5559/Patient
+
+  c) scripts/curlRequest.sh
+
+### Deprecated testing
 - To load Observations:  
   docker run --network host ghcr.io/elsalant/observation-generator:v1  
 (NOTE: On MacOS, the "--network" switch may not work.  In that case, it might be easiest to port-forward the fhir server and 
