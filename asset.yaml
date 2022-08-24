@@ -21,10 +21,11 @@ spec:
     tags:
       healthcare: true
     columns:
-      - name: id
+      - name: valueQuantity.value
         tags:
           PII: true
           blocked: false
-      - name: Patient
+      - name: subject.reference
         tags:
+          PII: true
           blocked: true
