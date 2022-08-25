@@ -1,2 +1,2 @@
-curl -k --location --request POST 'https://localhost:9443/fhir-server/api/v4/Observation' --header 'Content-Type: application/fhir+json' \
---user "fhiruser:change-password" --data-binary  "@testObservation.json"
+curl -k --location --request POST 'https://localhost:9443/fhir-server/api/v4/Observation' --header 'Content-Type: application/fhir+json' --user "fhiruser:change-password" --data-binary  "@testObservation.json"
+curl -k --location --request POST 'https://localhost:9443/fhir-server/api/v4/Observation' --header 'Content-Type: application/fhir+json' --user "fhiruser:change-password" --data-binary  "@testObservation2.json"

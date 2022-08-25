@@ -1,89 +1,91 @@
 data:
 {{- if .Values.labels }}
-   SUBMITTER: {{ get .Values.labels "requestedBy" | default "requester-missing" }}
+  SUBMITTER: {{ get .Values.labels "requestedBy" | default "requester-missing" }}
 {{- end }}
 {{- if .Values.read }}
 {{- range .Values.read }}
-  {{- if .source.connection.kafka }}
-    WP2_TOPIC: {{ .source.connection.kafka.topic_name }}
-    HEIR_KAFKA_HOST: {{ .source.connection.kafka.bootstrap_servers }}
-  {{- end }}
-  {{- if .source.connection.fhir }}
-   SECRET_NSPACE: {{ .source.connection.fhir.namespace }}
-   SECRET_FNAME: {{ .source.connection.fhir.secret_file }}
-  {{- end }}
-  {{- if .assetID }}
-   assetID: {{ .assetID }}
-  {{- end }}
+{{- if .source.connection.kafka }}
+  WP2_TOPIC: {{ .source.connection.kafka.topic_name }}
+  HEIR_KAFKA_HOST: {{ .source.connection.kafka.bootstrap_servers }}
+{{- end }}
+{{- if .assetID }}
+  assetID: {{ .assetID }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if .Values.assets }}
-  {{- range $asset := .Values.assets }}
-  {{- if $asset.transformations }}
-   transformations:
-   {{- $redactColumns := list -}}
-   {{- $statisticsColumn := list -}}
-   {{- $removeColumns := list -}}
-   {{- $blockColumns := list -}}
-   {{- $joinResource := list -}}
-   {{- range $asset.transformations }}
-     {{- if eq .name "RemoveColumn" }}
-       {{- $removeColumns = .RemoveColumn.columns -}}
-         - action: "RemoveColumn"
-           description: "Remove columns: {{ $removeColumns }}"
-           columns:
-             {{- range $removeColumns}}
-             - {{ . }}
-             {{- end }}
-     {{- end }}
-     {{- if eq .name "JoinResource" }}
-       {{- $joinTable := .JoinResource.joinTable }}
-       {{- $whereClause := .JoinResource.whereclause}}
-       {{- $joinStatement := .JoinResource.joinStatement}}
-       - action: "JoinResource"
-         description: "Perform a JOIN"
-         joinTable: "{{ $joinTable }}"
-         whereclause: "{{ $whereClause }}"
-         joinStatement: "{{ $joinStatement }}"
-     {{- end }}
-     {{- if eq .name "Statistics" }}
-       {{- $statisticsColumn = .Statistics.columns }}
-       - action: "Statistics"
-         description: "Perform statistical analysis on: {{ $statisticsColumn }}"
-         columns:
-           {{- range $statisticsColumn}}
-           - {{ . }}
-           {{- end }}
-     {{- end }}
-     {{- if eq .name "BlockResource" }}
-       {{- $blockColumns = .BlockResource.columns }}
-       - action: "BlockResource"
-         description: "Block all data for resource: {{ $blockColumns }}"
-         columns:
-           {{- range $blockColumns}}
-           - {{ . }}
-           {{- end }}
-     {{- end }}
-     {{- if eq .name "ReturnIntent" }}
-       - action: "ReturnIntent"
-         description: "Return the Intent value from the application"
-         intent: {{ .ReturnIntent.intent }}
-         columns: "N/A"
-     {{- end }}
-     {{- if eq .name "RedactColumn" }}
-       {{- $redactColumns = .RedactColumn.columns }}
-       - action: "RedactColumn"
-         description: "redact columns: {{ $redactColumns }}"
-         intent: {{ .RedactColumn.intent }}
-         columns:
-           {{- range $redactColumns}}
-           - {{ . }}
-           {{- end }}
-         options:
-           redactValue: "XXXXX"
-     {{- end }}
+{{- range $asset := .Values.assets }}
+{{- with (index .args 0)}}
+{{- if index . "connection" "fhir" }}
+  SECRET_NSPACE: {{ .connection.fhir.namespace }}
+  SECRET_FNAME: {{ .connection.fhir.secretRef }}
+{{- end }}
+{{- end }}
+{{- if $asset.transformations }}
+  transformations:
+{{- $redactColumns := list -}}
+{{- $statisticsColumn := list -}}
+{{- $removeColumns := list -}}
+{{- $blockColumns := list -}}
+{{- $joinResource := list -}}
+{{- range $asset.transformations }}
+{{- if eq .name "RemoveColumn" }}
+{{- $removeColumns = .RemoveColumn.columns -}}
+  - action: "RemoveColumn"
+    description: "Remove columns: {{ $removeColumns }}"
+    columns:
+{{- range $removeColumns}}
+      - {{ . }}
+{{- end }}
    {{- end }}
-   {{- end }}
- {{- end }}
+{{- if eq .name "JoinResource" }}
+{{- $joinTable := .JoinResource.joinTable }}
+{{- $whereClause := .JoinResource.whereclause}}
+{{- $joinStatement := .JoinResource.joinStatement}}
+  - action: "JoinResource"
+    description: "Perform a JOIN"
+    joinTable: "{{ $joinTable }}"
+    whereclause: "{{ $whereClause }}"
+    joinStatement: "{{ $joinStatement }}"
+{{- end }}
+{{- if eq .name "Statistics" }}
+{{- $statisticsColumn = .Statistics.columns }}
+  - action: "Statistics"
+    description: "Perform statistical analysis on: {{ $statisticsColumn }}"
+    columns:
+{{- range $statisticsColumn}}
+      - {{ . }}
+{{- end }}
+{{- end }}
+{{- if eq .name "BlockResource" }}
+{{- $blockColumns = .BlockResource.columns }}
+  - action: "BlockResource"
+    description: "Block all data for resource: {{ $blockColumns }}"
+    columns:
+{{- range $blockColumns}}
+      - {{ . }}
+{{- end }}
+{{- end }}
+{{- if eq .name "ReturnIntent" }}
+  - action: "ReturnIntent"
+    description: "Return the Intent value from the application"
+    intent: {{ .ReturnIntent.intent }}
+    columns: "N/A"
+{{- end }}
+{{- if eq .name "RedactColumn" }}
+{{- $redactColumns = .RedactColumn.columns }}
+  - action: "RedactColumn"
+    description: "redact columns: {{ $redactColumns }}"
+    intent: {{ .RedactColumn.intent }}
+    columns:
+{{- range $redactColumns}}
+      - {{ . }}
+{{- end }}
+    options:
+      redactValue: "XXXXX"
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end -}}
 

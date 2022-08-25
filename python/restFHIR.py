@@ -205,7 +205,7 @@ def apply_policy(jsonList, policies, origFHIR):
     stdStr = ''  # standard deviation
     std = ''
    # cleanPatientId = df['subject.reference'][0].replace('/', '-')
-    print('inside apply_policy. Length policies = ', str(len(policies)), " type(policies) = ", str(type(policies)))
+    print('inside apply_policy. Length policies = ', str(len(policies['transformations'])), " type(policies) = ", str(type(policies)))
     print(policies)
     if len(policies['transformations']) == 0:
         print('No transformations found!')
@@ -219,11 +219,12 @@ def apply_policy(jsonList, policies, origFHIR):
                 policies['transformations'] = [policies['transformations'][index]] + policies['transformations']
                 policies['transformations'].pop(index+1)
                 break
+
     for policy in policies['transformations']:
         action = policy['action']
+        print('Action = ' + action)
         if action == '':
             return (str(df.to_json()), VALID_RETURN)
-        print('Action = ' + action)
 
     # Allow specifying a particular attribute for a given resource by specifying the in policy file the
     # the column name as <resource>.<column_name>
@@ -241,11 +242,15 @@ def apply_policy(jsonList, policies, origFHIR):
                 print("No such column " + col + " to delete")
             for i in df.index:
                 jsonList = [json.loads(x) for x in dfToRows]
-            return (jsonList, VALID_RETURN)
+ #           return (jsonList, VALID_RETURN)
+            continue
 
-        if action == 'RedactColumn':
+        elif action == 'RedactColumn':
             replacementStr = policy['options']['redactValue']
             for col in policy['columns']:
+                # Flattening the FHIR means that an attribute may now appears with one or more '.', so the following
+                # code is no longer valid
+                '''
                 if '.' in col:
     # We can either be passing something of the form:  resource.attribute, or attribute, where attribute
     # itself may contain a '.'.  Take the result of the first split and see if that is equal to resourceType to differentiate
@@ -253,6 +258,8 @@ def apply_policy(jsonList, policies, origFHIR):
                     if resourceCandidate == df['resourceType'][0]:
                         col = colCandidate
                     print("resource, attribute specified: " + resourceCandidate + ", " + col)
+ '''
+                print('trying to replace ' + col + ' with ' + replacementStr  + ' in df: ')
                 try:
         # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
         # before replacing
@@ -263,7 +270,8 @@ def apply_policy(jsonList, policies, origFHIR):
             for i in df.index:
                 dfToRows.append(df.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
-            return (jsonList, VALID_RETURN)
+ #           return (jsonList, VALID_RETURN)
+            continue
 
         if action == 'BlockResource':
         #    if policy['transformations'][0]['columns'][0] == df['resourceType'][0]:
@@ -272,7 +280,7 @@ def apply_policy(jsonList, policies, origFHIR):
             else:
                 print('No resource to block!. resourceType =  ' + df['resourceType'][0] + \
                       ' policy[\'columns\'][0] = ' + df['resourceType'][0] in policy['columns'][0])
-                return(str(df.to_json()), VALID_RETURN)
+                continue
         # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
         # 1. Put the returned query results into an SQLite table
         # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
@@ -307,7 +315,7 @@ def apply_policy(jsonList, policies, origFHIR):
             else:
                 return (joinedJSON, VALID_RETURN)
 
-        if action == 'Statistics':
+        elif action == 'Statistics':
             for col in policy['columns']:
                 print('col = ', col)
                 try:
@@ -343,7 +351,10 @@ def apply_policy(jsonList, policies, origFHIR):
                 'CGM_STD': std
             }
             return(str(d), VALID_RETURN)
-        return('{"Unknown transformation": "'+ action + '"}', ERROR_CODE)
+        else:
+            return('{"Unknown transformation": "'+ action + '"}', ERROR_CODE)
+    print("after redaction, returning " + str(df.to_json()))
+    return (str(df.to_json()), VALID_RETURN)
 
 def timeWindow_filter(df):
     print("keys = ", df.keys())
@@ -437,7 +448,9 @@ def getAll(queryString=None):
               '\"policyDecision\": \"'  + str(cmDict['transformations']) + '\",' + \
               '\"intent\": \"' + intent + '\",\"Outcome": \"' + outcome + '\"}'
     logToKafka(jSONout, kafka_topic)
-    return (json.dumps(ans))
+    print('ans = '+ str(ans))
+    return(ans)
+ #   return (json.dumps(ans))
 
 def logToKafka(jString, kafka_topic):
     global producer
@@ -477,20 +490,30 @@ def main():
             raise ValueError('Error reading from file! ' + CM_PATH)
         print('cmReturn = ', cmReturn)
     if TEST:
+        cmDict = {'SUBMITTER': 'EliotSalant', 'assetID': 'test1', 'SECRET_NSPACE': 'rest-fhir',
+          'SECRET_FNAME': 'fhir-credentials', 'transformations': [
+        {'action': 'BlockResource', 'description': 'Block all data for resource: [subject.reference]',
+         'columns': ['subject.reference']},
+        {'action': 'JoinResource', 'description': 'Perform a JOIN', 'joinTable': 'Consent',
+         'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
+         'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '},
+        {'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value subject.reference]',
+         'intent': 'research', 'columns': ['valueQuantity.value', 'subject.reference'],
+         'options': {'redactValue': 'XXXXX'}}]}
  #       cmDict = {'dict_item': [
  #           ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
  #                                 'joinTable': 'Consent',
  #                                 'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
  #                                 'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '}])]}
-        cmDict = {'dict_item': [
-            ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
-                                  'joinTable': 'Consent',
-                                  'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
-                                  'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '},
-                                 {'action': 'RedactColumn', 'description': 'Redact PII fields',
-                                  'joinTable': 'Consent',
-                                  'columns': ['valueQuantity.value','subject.display', 'text.div', 'subject.reference'],
-                                                  'options': {'redactValue': 'XXXXX'}}])]}
+ #       cmDict = {'dict_item': [
+ #           ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
+ #                                'joinTable': 'Consent',
+ #                                 'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
+ #                                'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '},
+ #                                {'action': 'RedactColumn', 'description': 'Redact PII fields',
+ #                                 'joinTable': 'Consent',
+ #                                 'columns': ['valueQuantity.value','subject.display', 'text.div', 'subject.reference'],
+ #                                                 'options': {'redactValue': 'XXXXX'}}])]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
    #             'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
         cmDict = dict(cmDict['dict_item'])
