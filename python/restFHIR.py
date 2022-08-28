@@ -302,7 +302,8 @@ def apply_policy(jsonList, policies, origFHIR):
             joinJSON = read_from_fhir(joinQuery)
             logger.info('building JOIN table of name' + joinTable)
             sqlUtils.buildSQLtableFromJson(joinJSON[0], joinTable)
-            # Translate the original FHIHR query to SQL and then reformulate for the JOIN.
+            # The original FHIR query already applied any selection criteria.  We can therefore do a
+            # SELECT * on the returned data stored in the temporary view
             # No need to do anything with the returned aliasDict, since the original query is FHIR without aliasing
             origSQL = sqlUtils.fhirToSQL(origFHIR)
             joinQuery, aliasDict = sqlUtils.reformulateQuery(origSQL, whereclause, joinclause)
