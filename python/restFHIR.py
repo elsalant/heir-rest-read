@@ -282,7 +282,7 @@ def apply_policy(jsonList, policies, origFHIR):
                       ' policy[\'columns\'][0] = ' + df['resourceType'][0] in policy['columns'][0])
                 continue
         # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
-        # 1. Put the returned query results into an SQLite table
+        # 1. Put the returned query results from the original FHIR query into an SQLite table
         # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
         # 3. Translate the input FHIR query to SQL
         # 4. Reformulate the query based on the return from the Policy Manager to add the JOIN
