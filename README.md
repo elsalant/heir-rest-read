@@ -23,7 +23,7 @@ helm install ibmfhir oci://ghcr.io/elsalant/ibmfhir_orig --version=0.2.0 -n fybr
 docker run -p 9443:9443 -e BOOTSTRAP_DB=true ibmcom/ibm-fhir-server )
 4. Start the Kafka server:  
    - helm install kafka bitnami/kafka -n fybrik-system  
-   - Note that if the Kafka server needs to be exposed externally to the k8s cluster then instead do the following:
+   - Note that if the Kafka server needs to be exposed externally to the k8s cluster then instead do the following:  
 helm install kafka bitnami/kafka --set externalAccess.enabled=true --set externalAccess.autoDiscovery.enabled=true --set externalAccess.service.type=NodePort --set rbac.create=true
  
 Then, expose port 9094 on the Kubernetes cluster with the command:
