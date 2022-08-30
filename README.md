@@ -18,7 +18,7 @@ Do once:  make sure helm v3.7+ is installed
 1. export HELM_EXPERIMENTAL_OCI=1
 2. Install fybrik from the instructions in: https://fybrik.io/dev/get-started/quickstart/
 3. Start the IBM FHIR server service (out-of-box version):   
-helm install ibmfhir oci://ghcr.io/elsalant/ibmfhir_orig --version=0.2.0 -n fybrik-system
+helm install ibmfhir oci://ghcr.io/elsalant/ibmfhir_orig --version=0.2.0 -n fybrik-system  
 (If running in testing mode outside of k8s then:
 docker run -p 9443:9443 -e BOOTSTRAP_DB=true ibmcom/ibm-fhir-server )
 4. Start the Kafka server:  
