@@ -16,7 +16,7 @@ Do once:  make sure helm v3.7+ is installed
 > helm version
 
 1. export HELM_EXPERIMENTAL_OCI=1
-2. Install fybrik from the instructions in: https://fybrik.io/get-started/quickstart/
+2. Install fybrik from the instructions in: (https://fybrik.io/v1.0/get-started/quickstart/)
 3. Start the IBM FHIR server service (out-of-box version):   
 helm install ibmfhir oci://ghcr.io/elsalant/ibmfhir_orig --version=0.2.0 -n fybrik-system  
 (If running in testing mode outside of k8s then:
