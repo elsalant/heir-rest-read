@@ -46,7 +46,6 @@ kubectl apply -f restFHIRapplication.yaml
 - a) Load the FHIR server  
 kubectl port-forward svc/ibmfhir -n fybrik-system 9443:9443  
 scripts/createConsent.sh
-scripts/createConsent1.sh
 scripts/createObservation.sh
 
 - b) Port-forward pod in fybrik-blueprints  
