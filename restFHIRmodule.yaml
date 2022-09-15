@@ -20,13 +20,6 @@ spec:
         - name: BlockResource
         - name: ReturnIntent
         - name: JoinResource
-      api:
-        connection:
-          name: fhir
-          fhir:
-            fhirServer: 'https://fhir-sandbox.heirproject.eu/fhir-server/api/v4/'
-            port: 9443
-        dataFormat: json
       supportedInterfaces:
         - source:
             protocol: fhir
