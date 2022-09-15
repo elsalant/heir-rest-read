@@ -9,7 +9,7 @@ spec:
     connection:
       name: fhir
       fhir:
-        fhirServer: ibmfhir
+        fhirServer: 'https://fhir-sandbox.heirproject.eu/fhir-server/api/v4/'
         port: 9443
         namespace: rest-fhir
         secretRef: fhir-credentials

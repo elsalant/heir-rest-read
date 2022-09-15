@@ -37,6 +37,8 @@ if TEST:
     DEFAULT_FHIR_HOST = 'https://localhost:9443/fhir-server/api/v4/'
 else:
     DEFAULT_FHIR_HOST = 'https://ibmfhir.fybrik-system:9443/fhir-server/api/v4/'
+
+# for testing only.  Not in testing mode we get these values from the secret keys
 DEFAULT_FHIR_USER = 'fhiruser'
 DEFAULT_FHIR_PW = 'change-password'
 
@@ -55,7 +57,7 @@ LOW_THRESHOLD_DEFAULT = 4
 
 fhir_host = os.getenv("HEIR_FHIR_HOST") if os.getenv("HEIR_FHIR_HOST") else DEFAULT_FHIR_HOST
 fhir_user = os.getenv("HEIR_FHIR_USER") if os.getenv("HEIR_FHIR_USER") else DEFAULT_FHIR_USER
-fhir_pw = os.getenv("HEIR_FHIR_PW") if os.getenv("HEIR_FHIR_PW") else DEFAULT_FHIR_PW
+
 time_window = os.getenv("HEIR_TIMEWINDOW") if os.getenv("HEIR_TIMEWINDOW") else DEFAULT_TIMEWINDOW
 
 app = Flask(__name__)
@@ -140,10 +142,12 @@ def getSecretKeysExample(secret_name, secret_namespace):  # Not needed here.  Ma
 def read_from_fhir(queryString):
     if TEST:
         fhiruser = fhir_user
-        fhirpw = fhir_pw
+        fhirpw = DEFAULT_FHIR_PW
     else:
         fhiruser, fhirpw = getSecretKeys()
-    queryURL = fhir_host
+#    queryURL = fhir_host
+    queryURL = cmDict['FHIR_SERVER']
+    print('queryURL = ' + queryURL)
     params = ''
  #   auth = (fhir_user, fhir_pw)
     auth = (fhiruser, fhirpw)
@@ -177,7 +181,7 @@ def getSecretKeys():
     fhiruser = base64.b64decode(secret.data['fhiruser'])
     fhirpw = base64.b64decode(secret.data['fhirpasswd'])
     print('getSecretKeys: fhiruser = ' + fhiruser.decode('ascii') + ' fhirpw = ' + fhirpw.decode('ascii'))
-    return(fhiruser.decode('ascii'), fhirpw.decode('ascii'))
+    return(fhiruser.decode('ascii'), fhirpw.decode('ascii'), )
 
 def connect_to_kafka():
     global kafkaDisabled

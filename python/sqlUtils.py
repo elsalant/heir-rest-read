@@ -252,14 +252,15 @@ class SQLutils:
                 aliasDict[parts[0].strip()] = parts[1].strip()
         return aliasDict
 
-    # super simplified translation of FHIR to SQL
-    # Either GET <server>/Observation
-    # GET <server>/Observation?<field>=<value>
+    # Since the original query results already have any FHIR selection criteria applied, we can simply
+    # do a SELECT * here
     def fhirToSQL(self, fhirQuery):
         parsed = fhirQuery.split('?')
         tableName = parsed[0]
         sqlQuery = 'SELECT ' + tableName + '.* FROM ' + tableName
+        '''
         if len(parsed) > 1:
             searchParm = parsed[1]
             sqlQuery += ' WHERE ' + searchParm
+        '''
         return(tableName, sqlQuery)

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 ---
-apiVersion: app.fybrik.io/v1alpha1
+apiVersion: app.fybrik.io/v1beta1
 kind: FybrikModule
 metadata:
   name: resttofhir
@@ -24,7 +24,7 @@ spec:
         connection:
           name: fhir
           fhir:
-            fhirServer: ibmfhir
+            fhirServer: 'https://fhir-sandbox.heirproject.eu/fhir-server/api/v4/'
             port: 9443
         dataFormat: json
       supportedInterfaces:

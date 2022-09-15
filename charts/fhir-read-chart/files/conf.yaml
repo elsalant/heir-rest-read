@@ -19,6 +19,7 @@ data:
 {{- if index . "connection" "fhir" }}
   SECRET_NSPACE: {{ .connection.fhir.namespace }}
   SECRET_FNAME: {{ .connection.fhir.secretRef }}
+  FHIR_SERVER: {{ .connection.fhir.fhirServer}}
 {{- end }}
 {{- end }}
 {{- if $asset.transformations }}
