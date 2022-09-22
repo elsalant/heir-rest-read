@@ -71,7 +71,7 @@ def handleQuery(queryGatewayURL, queryString, apiToken, params, method):
  #   curlString = queryGatewayURL + str(base64.b64encode(queryStringsLessBlanks.encode('utf-8')))
     print("curlCommands: curlString = ", curlString)
     apiString = "apiToken " + apiToken
-    headers = {"authorization": apiString, "Content-Type": "application/json"}
+    headers = {"authorization": apiString, "Content-Type": "application/json", "Accept-Encoding":"json"}
     try:
       if (method == 'PUT'):
             r = requests.put(curlString, headers=headers, verify=False)
@@ -160,18 +160,7 @@ def read_from_fhir(queryString):
     returnedRecord = handleQuery(queryURL, queryString, apiToken, params, 'GET')
     if returnedRecord == None:
         return(['{"ERROR" : "returnedRecord empty!"}'], ERROR_CODE)
-    # Strip the bundle information out and convert to data frame
-    recordList = []
-    try:
-        for record in returnedRecord['entry']:
-            print("bundle detected")
-            recordList.append(json.dumps(record['resource']))
-    except:
-        print("no information returned!")
-        return(['{"ERROR" : "No information returned!"}'], ERROR_CODE)
-#    jsonList = [ast.literal_eval(x) for x in recordList]
-    jsonList = [json.loads(x) for x in recordList]
-    return (jsonList, VALID_RETURN)
+    return (returnedRecord, VALID_RETURN)
 
 def getSecretKeys():
     try:
