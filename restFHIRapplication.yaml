@@ -15,7 +15,4 @@ spec:
    intent: research
   data:
     - dataSetID: "rest-fhir/observation-json"
-      requirements:
-        interface: 
-          protocol: fhir
-          dataformat: json
+      requirements: {}
