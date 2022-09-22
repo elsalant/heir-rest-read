@@ -39,8 +39,7 @@ else:
     DEFAULT_FHIR_HOST = 'https://ibmfhir.fybrik-system:9443/fhir-server/api/v4/'
 
 # for testing only.  Not in testing mode we get these values from the secret keys
-DEFAULT_FHIR_USER = 'fhiruser'
-DEFAULT_FHIR_PW = 'change-password'
+DEFAULT_INSTANA_APITOKEN = 'kLXwf0qPQm25mCJU9O73Pg'
 
 DEFAULT_KAFKA_TOPIC = 'fhir-wp2-logging'
 DEFAULT_KAKFA_HOST = 'kafka.fybrik-system:9092'
@@ -56,7 +55,7 @@ HIGH_THRESHOLD_DEFAULT = 8.3
 LOW_THRESHOLD_DEFAULT = 4
 
 fhir_host = os.getenv("HEIR_FHIR_HOST") if os.getenv("HEIR_FHIR_HOST") else DEFAULT_FHIR_HOST
-fhir_user = os.getenv("HEIR_FHIR_USER") if os.getenv("HEIR_FHIR_USER") else DEFAULT_FHIR_USER
+fhir_user = os.getenv("HEIR_FHIR_USER") if os.getenv("HEIR_FHIR_USER") else 'EliotSalant'
 
 time_window = os.getenv("HEIR_TIMEWINDOW") if os.getenv("HEIR_TIMEWINDOW") else DEFAULT_TIMEWINDOW
 
@@ -64,20 +63,26 @@ app = Flask(__name__)
 cmDict = {}
 sqlUtils = SQLutils()
 
-def handleQuery(queryGatewayURL, queryString, auth, params, method):
+def handleQuery(queryGatewayURL, queryString, apiToken, params, method):
   #  print("querystring = " + queryString)
     queryStringsLessBlanks = re.sub(' +', ' ', queryString)
 
     curlString = queryGatewayURL + urllib.parse.unquote_plus(queryStringsLessBlanks)
  #   curlString = queryGatewayURL + str(base64.b64encode(queryStringsLessBlanks.encode('utf-8')))
     print("curlCommands: curlString = ", curlString)
+    apiString = "apiToken " + apiToken
+    headers = {"authorization": apiString, "Content-Type": "application/json"}
     try:
-      if (method == 'POST'):
-        r = requests.post(curlString, auth=auth, params=params, verify=False)
+      if (method == 'PUT'):
+            r = requests.put(curlString, headers=headers, verify=False)
+      elif (method == 'POST'):
+ #       r = requests.post(curlString, auth=auth, params=params, verify=False)
+        r = requests.post(curlString, headers=headers,  verify=False)
       else:
-        r = requests.get(curlString, auth=auth, params=params, verify=False)
+        r = requests.get(curlString, headers=headers, verify=False)
+ #       r = requests.get(curlString, auth=auth, params=params, verify=False)
     except Exception as e:
-      print("Exception in handleQuery, curlString = " + curlString + ", auth = " + str(auth))
+      print("Exception in handleQuery, curlString = " + curlString + ", apiToken = " + str(apiToken))
       print(e.args)
       return(ERROR_CODE)
 
@@ -141,8 +146,8 @@ def getSecretKeysExample(secret_name, secret_namespace):  # Not needed here.  Ma
 
 def read_from_fhir(queryString):
     if TEST:
-        fhiruser = fhir_user
-        fhirpw = DEFAULT_FHIR_PW
+        fhiruser = 'EliotSalant'
+        fhirpw = DEFAULT_INSTANA_APITOKEN
     else:
         fhiruser, fhirpw = getSecretKeys()
 #    queryURL = fhir_host
@@ -150,9 +155,9 @@ def read_from_fhir(queryString):
     print('queryURL = ' + queryURL)
     params = ''
  #   auth = (fhir_user, fhir_pw)
-    auth = (fhiruser, fhirpw)
+    apiToken = fhiruser
 
-    returnedRecord = handleQuery(queryURL, queryString, auth, params, 'GET')
+    returnedRecord = handleQuery(queryURL, queryString, apiToken, params, 'GET')
     if returnedRecord == None:
         return(['{"ERROR" : "returnedRecord empty!"}'], ERROR_CODE)
     # Strip the bundle information out and convert to data frame
@@ -178,8 +183,8 @@ def getSecretKeys():
     secret_fname = cmDict['SECRET_FNAME']
     print("secret_fname = " + secret_fname + " secret_namespace = " + secret_namespace)
     secret = v1.read_namespaced_secret(secret_fname, secret_namespace)
-    fhiruser = base64.b64decode(secret.data['fhiruser'])
-    fhirpw = base64.b64decode(secret.data['fhirpasswd'])
+    fhiruser = base64.b64decode(secret.data['apitoken'])
+    fhirpw = base64.b64decode(secret.data['apitoken'])
     print('getSecretKeys: fhiruser = ' + fhiruser.decode('ascii') + ' fhirpw = ' + fhirpw.decode('ascii'))
     return(fhiruser.decode('ascii'), fhirpw.decode('ascii'), )
 
@@ -423,15 +428,15 @@ def getAll(queryString=None):
     for i in cmDict['transformations']:
         if 'intent' in i:
             intent = i['intent']
-    if (queryRequester != requester):
-        print("queryRequester " + queryRequester + " != " + requester)
-        jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + queryRequester + '\", \"Query\": \"' + queryString + \
-                    '\", \"ClientIP\": \"' + str(request.remote_addr) + '\",' + \
-                  '\"assetID": \"' + assetID + '\",' + \
-                  '\"policyDecision\": \"' + str(cmDict['transformations']) + '\",' + \
-                    '"intent\": \"' + intent +'\", \"Outcome": \"UNAUTHORIZED\"}'
-        logToKafka(jSONout, kafka_topic)
-        return ("{\"Error\": \"Unauthorized access attempt!\"}")
+ #   if (queryRequester != requester):
+ #       print("queryRequester " + queryRequester + " != " + requester)
+ #       jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + queryRequester + '\", \"Query\": \"' + queryString + \
+ #                   '\", \"ClientIP\": \"' + str(request.remote_addr) + '\",' + \
+ #                 '\"assetID": \"' + assetID + '\",' + \
+ #                 '\"policyDecision\": \"' + str(cmDict['transformations']) + '\",' + \
+ #                   '"intent\": \"' + intent +'\", \"Outcome": \"UNAUTHORIZED\"}'
+ #       logToKafka(jSONout, kafka_topic)
+ #       return ("{\"Error\": \"Unauthorized access attempt!\"}")
 
     # Go out to the actual FHIR server
     print("request.method = " + request.method)

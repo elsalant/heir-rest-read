@@ -1,0 +1,31 @@
+apiVersion: katalog.fybrik.io/v1alpha1
+kind: Asset
+metadata:
+  name: instana-json
+  namespace: rest-fhir
+spec:
+  details:
+    dataFormat: json
+    connection:
+      name: fhir
+      fhir:
+        fhirServer: 'https://demoeu-instana.instana.io/'
+        port: 80
+        namespace: rest-fhir
+        secretRef: instana-credentials
+  secretRef:
+      name: instana-credentials
+  metadata:
+    name: FHIR server
+    geography: UK
+    tags:
+      healthcare: true
+    columns:
+      - name: label
+        tags:
+          PII: true
+          blocked: false
+      - name: pathToValueInBeacon
+        tags:
+          PII: true
+          blocked: true

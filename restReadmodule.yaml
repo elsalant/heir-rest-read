@@ -25,9 +25,9 @@ spec:
             protocol: fhir
             dataformat: json
   chart:
-    name: ghcr.io/fybrik/fhir-read-chart:0.0.1
+    name: ghcr.io/elsalant/rest-read-chart:0.0.2
     values:
-      image.tag: 0.0.1
+      image.tag: instana
   statusIndicators:
     - kind: StreamTransfer
       successCondition: status.status == SUCCEEDED

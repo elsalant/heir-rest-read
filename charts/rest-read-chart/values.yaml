@@ -5,8 +5,8 @@
 replicaCount: 1
 
 image: 
-  repository:  ghcr.io/fybrik/fhir-read-module
-  tag: 0.0.1
+  repository:  ghcr.io/elsalant/fhir-read-module
+  tag: instana
   pullPolicy: Always
   pullSecret: null
 

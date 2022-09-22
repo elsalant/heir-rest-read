@@ -14,5 +14,5 @@ spec:
   appInfo:
    intent: research
   data:
-    - dataSetID: "rest-fhir/observation-json"
+    - dataSetID: "rest-fhir/instana-json"
       requirements: {}
