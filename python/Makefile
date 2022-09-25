@@ -1,8 +1,8 @@
 export DOCKER_USERNAME ?= fybrik
 export DOCKER_PASSWORD ?= 
 export DOCKER_HOSTNAME ?= ghcr.io
-export DOCKER_NAMESPACE ?= fybrik
-export DOCKER_TAGNAME ?= 0.0.1
+export DOCKER_NAMESPACE ?= elsalant
+export DOCKER_TAGNAME ?= instana
 
 DOCKER_IMG_NAME ?= fhir-read-module
 DOCKER_FILE ?= ./Dockerfile

@@ -31,6 +31,7 @@ BLOCK_CODE = 501
 VALID_RETURN = 200
 
 TEST = False   # allows testing outside of Fybrik/Kubernetes environment
+INSTANA = True
 logger = logging.getLogger(__name__)
 
 if TEST:
@@ -196,8 +197,10 @@ def connect_to_kafka():
 # Pass in the data to be redacted as jsonList, along with the redaction policies
 # origFHIR is required if we are doing a JOIN, as we need to translate this to SQL
 def apply_policy(jsonList, policies, origFHIR):
-    df = pd.json_normalize(jsonList)
-    redactedData = []
+    print('original data: ' + str(jsonList))
+#    df = pd.json_normalize(jsonList)
+#    print('df.keys' + str(df.keys()))
+#    redactedData = []
     # Redact df based on policy returned from the policy manager
     meanStr = ''
     stdStr = ''  # standard deviation
@@ -219,6 +222,9 @@ def apply_policy(jsonList, policies, origFHIR):
                 break
 
     for policy in policies['transformations']:
+        df = pd.json_normalize(jsonList)
+        print('df.keys' + str(df.keys()))
+        redactedData = []
         action = policy['action']
         print('Action = ' + action)
         if action == '':
@@ -238,8 +244,6 @@ def apply_policy(jsonList, policies, origFHIR):
                     df.drop(col, inplace=True, axis=1)
             except:
                 print("No such column " + col + " to delete")
-            for i in df.index:
-                jsonList = [json.loads(x) for x in dfToRows]
  #           return (jsonList, VALID_RETURN)
             continue
 
@@ -268,7 +272,7 @@ def apply_policy(jsonList, policies, origFHIR):
             for i in df.index:
                 dfToRows.append(df.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
- #           return (jsonList, VALID_RETURN)
+  #          return (str(jsonList), VALID_RETURN)
             continue
 
         if action == 'BlockResource':
@@ -352,8 +356,13 @@ def apply_policy(jsonList, policies, origFHIR):
             return(str(d), VALID_RETURN)
         else:
             return('{"Unknown transformation": "'+ action + '"}', ERROR_CODE)
-    print("after redaction, returning " + str(df.to_json()))
-    return (str(df.to_json()), VALID_RETURN)
+    for i in df.index:
+        dfToRows.append(df.loc[i].to_json())
+    jsonList = [json.loads(x) for x in dfToRows]
+    print('after redaction: ' + str(jsonList))
+    return(str(jsonList), VALID_RETURN)
+#    print("after redaction, returning " + str(df.to_json()))
+ #   return (str(df.to_json()), VALID_RETURN)
 
 def timeWindow_filter(df):
     print("keys = ", df.keys())
