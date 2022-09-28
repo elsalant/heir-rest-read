@@ -30,7 +30,7 @@ ERROR_CODE = 406
 BLOCK_CODE = 501
 VALID_RETURN = 200
 
-TEST = False   # allows testing outside of Fybrik/Kubernetes environment
+TEST = False  # allows testing outside of Fybrik/Kubernetes environment
 INSTANA = True
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,7 @@ app = Flask(__name__)
 cmDict = {}
 sqlUtils = SQLutils()
 
-def handleQuery(queryGatewayURL, queryString, apiToken, params, method):
+def handleQuery(queryGatewayURL, queryString, apiToken, data, method):
   #  print("querystring = " + queryString)
     queryStringsLessBlanks = re.sub(' +', ' ', queryString)
 
@@ -75,12 +75,12 @@ def handleQuery(queryGatewayURL, queryString, apiToken, params, method):
     headers = {"authorization": apiString, "Content-Type": "application/json", "Accept-Encoding":"json"}
     try:
       if (method == 'PUT'):
-            r = requests.put(curlString, headers=headers, verify=False)
+            r = requests.put(curlString, headers=headers, data=data, verify=False)
       elif (method == 'POST'):
  #       r = requests.post(curlString, auth=auth, params=params, verify=False)
-        r = requests.post(curlString, headers=headers,  verify=False)
+        r = requests.post(curlString, headers=headers, data=data, verify=False)
       else:
-        r = requests.get(curlString, headers=headers, verify=False)
+        r = requests.get(curlString, headers=headers, data=data, verify=False)
  #       r = requests.get(curlString, auth=auth, params=params, verify=False)
     except Exception as e:
       print("Exception in handleQuery, curlString = " + curlString + ", apiToken = " + str(apiToken))
@@ -145,7 +145,7 @@ def getSecretKeysExample(secret_name, secret_namespace):  # Not needed here.  Ma
     secretAccessKey = base64.b64decode(secret.data['secret_key'])
     return(accessKeyID.decode('ascii'), secretAccessKey.decode('ascii'))
 
-def read_from_fhir(queryString):
+def read_from_fhir(queryString, method, data):
     if TEST:
         fhiruser = 'EliotSalant'
         fhirpw = DEFAULT_INSTANA_APITOKEN
@@ -154,14 +154,18 @@ def read_from_fhir(queryString):
 #    queryURL = fhir_host
     queryURL = cmDict['FHIR_SERVER']
     print('queryURL = ' + queryURL)
-    params = ''
  #   auth = (fhir_user, fhir_pw)
     apiToken = fhiruser
 
-    returnedRecord = handleQuery(queryURL, queryString, apiToken, params, 'GET')
+    returnedRecord = handleQuery(queryURL, queryString, apiToken, data, method)
     if returnedRecord == None:
         return(['{"ERROR" : "returnedRecord empty!"}'], ERROR_CODE)
-    return (returnedRecord, VALID_RETURN)
+
+    # INSTANA HACK
+    if 'items' in returnedRecord:
+        return(returnedRecord['items'], VALID_RETURN)
+    else:
+        return (returnedRecord, VALID_RETURN)
 
 def getSecretKeys():
     try:
@@ -197,7 +201,7 @@ def connect_to_kafka():
 # Pass in the data to be redacted as jsonList, along with the redaction policies
 # origFHIR is required if we are doing a JOIN, as we need to translate this to SQL
 def apply_policy(jsonList, policies, origFHIR):
-    print('original data: ' + str(jsonList))
+#    print('original data: ' + str(jsonList))
 #    df = pd.json_normalize(jsonList)
 #    print('df.keys' + str(df.keys()))
 #    redactedData = []
@@ -210,6 +214,7 @@ def apply_policy(jsonList, policies, origFHIR):
     print(policies)
     if len(policies['transformations']) == 0:
         print('No transformations found!')
+        df = pd.json_normalize(jsonList)
         return (str(df.to_json()))
     # There can be a number of policies that need to be applied.  If we have a JOIN, this needs to be done
     # first, before the the redaction.  In that case, the case, the data returned by the JOIN needs to have the
@@ -220,7 +225,7 @@ def apply_policy(jsonList, policies, origFHIR):
                 policies['transformations'] = [policies['transformations'][index]] + policies['transformations']
                 policies['transformations'].pop(index+1)
                 break
-
+    print('type jsonList = ' + str(type(jsonList)))
     for policy in policies['transformations']:
         df = pd.json_normalize(jsonList)
         print('df.keys' + str(df.keys()))
@@ -260,7 +265,7 @@ def apply_policy(jsonList, policies, origFHIR):
                     if resourceCandidate == df['resourceType'][0]:
                         col = colCandidate
                     print("resource, attribute specified: " + resourceCandidate + ", " + col)
- '''
+                '''
                 print('trying to replace ' + col + ' with ' + replacementStr  + ' in df: ')
                 try:
         # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
@@ -301,7 +306,8 @@ def apply_policy(jsonList, policies, origFHIR):
             # Call in to FHIR to get the join resource values, and put the results into a table.
             # The passed 'joinTable' value must be the name of the FHIR resource
             joinQuery = joinTable
-            joinJSON = read_from_fhir(joinQuery)
+            data = ''
+            joinJSON = read_from_fhir(joinQuery, data)
             logger.info('building JOIN table of name' + joinTable)
             sqlUtils.buildSQLtableFromJson(joinJSON[0], joinTable)
             # The original FHIR query already applied any selection criteria.  We can therefore do a
@@ -436,9 +442,10 @@ def getAll(queryString=None):
  #       logToKafka(jSONout, kafka_topic)
  #       return ("{\"Error\": \"Unauthorized access attempt!\"}")
 
-    # Go out to the actual FHIR server
+    # Go out to the actual REST server
     print("request.method = " + request.method)
-    dfBack, messageCode = read_from_fhir(queryString)
+
+    dfBack, messageCode = read_from_fhir(queryString, request.method, request.data)
     if (messageCode != VALID_RETURN):
         return ("{\"Error\": \"No information returned!\"}")
 #apply_policies
@@ -456,7 +463,7 @@ def getAll(queryString=None):
               '\"policyDecision\": \"'  + str(cmDict['transformations']) + '\",' + \
               '\"intent\": \"' + intent + '\",\"Outcome": \"' + outcome + '\"}'
     logToKafka(jSONout, kafka_topic)
-    print('ans = '+ str(ans))
+ #   print('ans = '+ str(ans))
     return(ans)
  #   return (json.dumps(ans))
 
@@ -524,9 +531,9 @@ def main():
  #                                                 'options': {'redactValue': 'XXXXX'}}])]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
    #             'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
-        cmDict = dict(cmDict['dict_item'])
-   #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
-   #          'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
+   #     cmDict = dict(cmDict['dict_item'])
+        cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
+             'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: Patient', 'columns': ['Patient'], 'options': {'redactValue': 'XXXXX'}}])]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: ',
    #                                               'columns': ['valueQuantity.value','subject.display', 'text.div', 'subject.reference'],

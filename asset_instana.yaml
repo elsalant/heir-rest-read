@@ -21,11 +21,17 @@ spec:
     tags:
       healthcare: true
     columns:
-      - name: label
+      - name: beacon.userName
         tags:
           PII: true
           blocked: false
-      - name: pathToValueInBeacon
+      - name: beacon.userEmail
         tags:
           PII: true
           blocked: true
+      - name: label
+        tags:
+          PII: true
+      - name: pathToValueInBeacon
+        tags:
+          PII: true
