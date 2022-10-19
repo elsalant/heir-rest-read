@@ -43,7 +43,7 @@ DEFAULT_FHIR_USER = 'fhiruser'
 DEFAULT_FHIR_PW = 'change-password'
 
 DEFAULT_KAFKA_TOPIC = 'fhir-wp2-logging'
-DEFAULT_KAKFA_HOST = 'kafka.fybrik-system:9092'
+DEFAULT_KAKFA_HOST = 'kafka.heirauditingmechanism:9092'
 
 kafka_host = os.getenv("HEIR_KAFKA_HOST") if os.getenv("HEIR_KAFKA_HOST") else DEFAULT_KAKFA_HOST
 kafka_topic = os.getenv("HEIR_KAFKA_TOPIC") if os.getenv("HEIR_KAFKA_TOPIC") else DEFAULT_KAFKA_TOPIC
