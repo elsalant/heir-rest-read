@@ -176,11 +176,13 @@ class SQLutils:
         r = [dict((self.cursor.description[i][0], value) \
                   for i, value in enumerate(row)) for row in rows]
         # In order to return the original JSON structure
-        cleanDict = r[0]
-        cleanDict.pop('index')
+        if r:
+            cleanDict = r[0]
+            cleanDict.pop('index')
  #       returnJson = json.dumps(unflatten_list(cleanDict))
-        return unflatten_list(cleanDict)
-#        return r
+            return unflatten_list(cleanDict)
+        else:
+            return r
 
     def dropTable(self, sqlConnect, tableName):
         sqlConnect.execute('DROP TABLE IF EXISTS ' + tableName + ';')

@@ -28,4 +28,4 @@ spec:
       - name: subject.reference
         tags:
           PII: true
-          blocked: true
+          blocked: false
