@@ -447,10 +447,15 @@ def getAll(queryString=None):
     else:
         outcome = "ERROR"
     # Log the query request
+    # Apparently there is a bug in Fybrik that is returning a " instead of '
+    # workaround
+    print('policyDecision before = '+str(cmDict['transformations']))
+    policyDecision = str(cmDict['transformations']).replace("\"", "\'")
+    print('policyDecision afte r= '+policyDecision)
     jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + requester + '\", \"Query\": \"' + queryString + '\",' + \
               '\"ClientIP\": \"' + str(request.remote_addr) + '\",' + \
               '\"assetID": \"' + assetID + '\",' + \
-              '\"policyDecision\": \"'  + str(cmDict['transformations']) + '\",' + \
+              '\"policyDecision\": \"'  + policyDecision + '\",' + \
               '\"intent\": \"' + intent + '\",\"Outcome": \"' + outcome + '\"}'
     logToKafka(jSONout, kafka_topic)
     print('ans = '+ str(ans))

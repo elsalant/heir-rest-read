@@ -224,6 +224,7 @@ class SQLutils:
         selectQuery = self.getSelectCondition(origQuery)
         if selectQuery:
             aliasDict = self.getSubstitutions(selectQuery)
+        print('sqlUtils: rebuiltQuery = ' + rebuiltQuery)
         return rebuiltQuery, aliasDict
 
     def getSelectCondition(self, origQuery):
