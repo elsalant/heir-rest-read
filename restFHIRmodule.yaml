@@ -20,6 +20,7 @@ spec:
         - name: BlockResource
         - name: ReturnIntent
         - name: JoinResource
+        - name: JoinAndRedact
       supportedInterfaces:
         - source:
             protocol: fhir
