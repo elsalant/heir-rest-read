@@ -30,7 +30,7 @@ ERROR_CODE = 406
 BLOCK_CODE = 501
 VALID_RETURN = 200
 
-TEST = True   # allows testing outside of Fybrik/Kubernetes environment
+TEST = False   # allows testing outside of Fybrik/Kubernetes environment
 logger = logging.getLogger(__name__)
 
 if TEST:

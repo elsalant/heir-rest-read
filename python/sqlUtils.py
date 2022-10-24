@@ -5,7 +5,7 @@ from flatten_json import flatten, unflatten_list
 import sqlparse
 import re
 
-TEST = True
+TEST = False
 if TEST:
     DB_FILE = '/Users/eliot/temp/heirsql.db'
 else:
