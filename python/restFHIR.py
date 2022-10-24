@@ -30,7 +30,7 @@ ERROR_CODE = 406
 BLOCK_CODE = 501
 VALID_RETURN = 200
 
-TEST = False   # allows testing outside of Fybrik/Kubernetes environment
+TEST = True   # allows testing outside of Fybrik/Kubernetes environment
 logger = logging.getLogger(__name__)
 
 if TEST:
@@ -199,6 +199,9 @@ def connect_to_kafka():
     print("Connection to Kafka succeeded! " + kafka_host)
     return(producer)
 
+def redactEntry(dfLine, df):
+    pass
+
 # Pass in the data to be redacted as jsonList, along with the redaction policies
 # origFHIR is required if we are doing a JOIN, as we need to translate this to SQL
 def apply_policy(jsonList, policies, origFHIR):
@@ -285,6 +288,56 @@ def apply_policy(jsonList, policies, origFHIR):
                 print('No resource to block!. resourceType =  ' + df['resourceType'][0] + \
                       ' policy[\'columns\'][0] = ' + df['resourceType'][0] in policy['columns'][0])
                 continue
+        # This redaction was requested for the NSE use case.
+        # If there is no consent for an individual patient record (row), redact all PII from the row,
+        # else reveal all
+        if action == 'JoinAndRedact':
+            current_timestamp = datetime.now(timezone.utc)
+            whereclause = policy['whereclause']
+            joinTable = policy['joinTable']
+            # Call in to FHIR to get the join resource (i.e. 'Consent'), and put the results into a df.
+            # The passed 'joinTable' value must be the name of the FHIR resource
+            joinQuery = joinTable
+            consentTuple = read_from_fhir(joinQuery)
+            consentDF = pd.json_normalize(consentTuple[0])
+
+            end_consentList = []
+            # if the subject.reference is not in the Consent table, then this needs to be redacted
+            consentMissingDF = df.loc[~df['subject.reference'].isin(consentDF['patient.reference'])]
+            # Add a new column to the consentDF df which is "end_date" and is in timestamp format
+            for index in consentDF.index:
+                end_consentList.append(datetime.strptime(consentDF['provision.provision'][index][0]['period']['end'], '%Y-%m-%dT%H:%M:%S%z'))
+            print('end_consentList = ' + str(end_consentList))
+            consentDF['end_consent'] = end_consentList
+ #               consentDF['end_consent'][index] = datetime.strptime(consentDF['provision.provision'][index][0]['period']['end'], '%Y-%m-%dT%H:%M:%S%z')
+            outOfTimePeriodDF = len(df.loc[df['subject.reference'].isin(consentDF['patient.reference'])]) > 0 and \
+                consentDF.loc[consentDF['end_consent']  > current_timestamp]
+            inTimePeriodDF = len(df.loc[df['subject.reference'].isin(consentDF['patient.reference'])]) > 0 and \
+                consentDF.loc[consentDF['end_consent']  <= current_timestamp]
+  # Redact the dataframes for outOfTimePeriodDF and consentMissingDF and then append these results to the unredacted inTimePeriodDF
+
+            replacementStr = policy['options']['redactValue']
+            for col in policy['columns']:
+                print('trying to replace ' + col + ' with ' + replacementStr + ' in df: ')
+                try:
+                    # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
+                    # before replacing
+                    #              df[col].replace(r'.+', replacementStr, regex=True, inplace=True)
+                    outOfTimePeriodDF[col] = outOfTimePeriodDF[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
+                    consentMissingDF[col] = consentMissingDF[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
+                except:
+                    print("No such column " + col + " to redact")
+            for i in outOfTimePeriodDF.index:
+                dfToRows.append(outOfTimePeriodDF.loc[i].to_json())
+            for i in consentMissingDF.index:
+                dfToRows.append(consentMissingDF.loc[i].to_json())
+            for i in consentMissingDF.index:
+                dfToRows.append(consentMissingDF.loc[i].to_json())
+            jsonList = [json.loads(x) for x in dfToRows]
+            print('JoinAndRedact about to return ' + str(jsonList))
+            return jsonList, VALID_RETURN
+
+        # df.loc[datetime.strptime(consentDF['provision.provision'][0][0]['period']['start'], '%Y-%m-%dT%H:%M:%S%z')  > current_timestamp]
         # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
         # 1. Put the returned query results from the original FHIR query into an SQLite table
         # 2. Execute a FHIR query to get all the records in the resource to be joined and put in an SQLite table
@@ -501,7 +554,7 @@ def main():
         print('cmReturn = ', cmReturn)
     if TEST:
         cmDict = {'SUBMITTER': 'EliotSalant', 'assetID': 'test1', 'SECRET_NSPACE': 'rest-fhir',
-          'SECRET_FNAME': 'fhir-credentials', 'transformations': [
+          'SECRET_FNAME': 'fhir-credentials', 'FHIR_SERVER' : 'https://localhost:9443/fhir-server/api/v4/', 'transformations': [
         {'action': 'BlockResource', 'description': 'Block all data for resource: [subject.reference]',
          'columns': ['subject.reference']},
         {'action': 'JoinResource', 'description': 'Perform a JOIN', 'joinTable': 'Consent',
@@ -526,8 +579,7 @@ def main():
  #                                                 'options': {'redactValue': 'XXXXX'}}])]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
    #             'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
-        cmDict = dict(cmDict['dict_item'])
-   #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
+   #    cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value id]',
    #          'columns': ['valueQuantity.value', 'id'], 'options': {'redactValue': 'XXXXX'}}]), ('assetID', 'sql-fhir/observation-json')]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: Patient', 'columns': ['Patient'], 'options': {'redactValue': 'XXXXX'}}])]}
    #     cmDict = {'dict_item': [('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: ',

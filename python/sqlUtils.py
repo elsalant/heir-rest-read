@@ -5,9 +5,9 @@ from flatten_json import flatten, unflatten_list
 import sqlparse
 import re
 
-TEST = False
+TEST = True
 if TEST:
-    DB_FILE = '/Users/eliot/tmp/heirsql.db'
+    DB_FILE = '/Users/eliot/temp/heirsql.db'
 else:
     DB_FILE = '/tmp/heirsql.db'
 
