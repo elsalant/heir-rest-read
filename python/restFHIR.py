@@ -212,11 +212,12 @@ def apply_policy(jsonList, policies, origFHIR):
     stdStr = ''  # standard deviation
     std = ''
    # cleanPatientId = df['subject.reference'][0].replace('/', '-')
-    print('inside apply_policy. Length policies = ', str(len(policies['transformations'])), " type(policies) = ", str(type(policies)))
-    print(policies)
-    if len(policies['transformations']) == 0:
+    if policies['transformations']:
+        print('inside apply_policy. Length policies = ', str(len(policies['transformations'])), " type(policies) = ", str(type(policies)))
+        print(policies)
+    if policies['transformations'] == None or len(policies['transformations']) == 0:
         print('No transformations found!')
-        return (str(df.to_json()))
+        return (str(df.to_json()), VALID_RETURN )
     # There can be a number of policies that need to be applied.  If we have a JOIN, this needs to be done
     # first, before the the redaction.  In that case, the case, the data returned by the JOIN needs to have the
     # redaction applied to it.  Make sure that the JoinResource actions is the first in the list
@@ -335,7 +336,7 @@ def apply_policy(jsonList, policies, origFHIR):
                 dfToRows.append(consentMissingDF.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
             print('JoinAndRedact about to return ' + str(jsonList))
-            return jsonList, VALID_RETURN
+            return str(jsonList), VALID_RETURN
 
         # df.loc[datetime.strptime(consentDF['provision.provision'][0][0]['period']['start'], '%Y-%m-%dT%H:%M:%S%z')  > current_timestamp]
         # In this case, the policy is specifying another data source (FHIR resource) to JOIN with.
@@ -473,9 +474,12 @@ def getAll(queryString=None):
     else:
         assetID = __name__
     intent = 'Not given'
-    for i in cmDict['transformations']:
-        if 'intent' in i:
-            intent = i['intent']
+    if cmDict['transformations'] == None:
+        print('No transformations defined!')
+    else:
+        for i in cmDict['transformations']:
+            if 'intent' in i:
+                intent = i['intent']
     if (queryRequester != requester):
         print("queryRequester " + queryRequester + " != " + requester)
         jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + queryRequester + '\", \"Query\": \"' + queryString + \

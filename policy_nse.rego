@@ -1,6 +1,7 @@
 package dataapi.authz
 
-rule[{"action": {"name": "JoinAndRedact", "joinTable" : "Consent", "whereclause" : " WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP", "joinStatement" : " JOIN consent ON observation.subject_reference = consent.patient_reference "}, "policy": description}]  {
+rule[{"action": {"name": "JoinAndRedact", "joinTable" : "Consent", "whereclause" : " WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP", "joinStatement" : " JOIN consent ON observation.subject_reference = consent.patient_reference ", "columns": column_names}, "policy": description}]  {
     description := "Executes a JOIN on the Consent table"
-    1 == 1
+    column_names := [input.resource.metadata.columns[i].name | input.resource.metadata.columns[i].tags.PII]
+    count(column_names) > 0
 }

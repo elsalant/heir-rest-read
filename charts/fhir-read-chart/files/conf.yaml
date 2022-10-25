@@ -29,6 +29,7 @@ data:
 {{- $removeColumns := list -}}
 {{- $blockColumns := list -}}
 {{- $joinResource := list -}}
+{{- $joinAndRedact := list -}}
 {{- range $asset.transformations }}
 {{- if eq .name "RemoveColumn" }}
 {{- $removeColumns = .RemoveColumn.columns -}}
@@ -64,6 +65,23 @@ data:
     description: "Block all data for resource: {{ $blockColumns }}"
     columns:
 {{- range $blockColumns}}
+      - {{ . }}
+{{- end }}
+{{- end }}
+{{- if eq .name "JoinAndRedact" }}
+{{- $joinTable := .JoinAndRedact.joinTable }}
+{{- $whereClause := .JoinAndRedact.whereclause}}
+{{- $joinStatement := .JoinAndRedact.joinStatement}}
+{{- $redactColumns = .JoinAndRedact.columns }}
+  - action: "JoinAndRedact"
+    description: "redact columns if no consent: {{ $redactColumns }}"
+    options:
+        redactValue: "XXXXX"
+    joinTable: "{{ $joinTable }}"
+    whereclause: "{{ $whereClause }}"
+    joinStatement: "{{ $joinStatement }}"
+    columns:
+{{- range $redactColumns}}
       - {{ . }}
 {{- end }}
 {{- end }}
