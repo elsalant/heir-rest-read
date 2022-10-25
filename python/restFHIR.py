@@ -45,6 +45,8 @@ DEFAULT_FHIR_PW = 'change-password'
 DEFAULT_KAFKA_TOPIC = 'fhir-wp2-logging'
 DEFAULT_KAKFA_HOST = 'kafka.heirauditingmechanism:9092'
 
+BLOCKCHAIN_HOST = 'http://heirauditclient.heirauditingmechanism:8081'
+
 kafka_host = os.getenv("HEIR_KAFKA_HOST") if os.getenv("HEIR_KAFKA_HOST") else DEFAULT_KAKFA_HOST
 kafka_topic = os.getenv("HEIR_KAFKA_TOPIC") if os.getenv("HEIR_KAFKA_TOPIC") else DEFAULT_KAFKA_TOPIC
 
@@ -145,8 +147,14 @@ def read_from_fhir(queryString):
         fhirpw = DEFAULT_FHIR_PW
     else:
         fhiruser, fhirpw = getSecretKeys()
-#    queryURL = fhir_host
-    queryURL = cmDict['FHIR_SERVER']
+#    queryURL = fhir_host or blockchain host, depending on the original URL
+    # This is sort of a hack - nearly all the calls to the blockchain contain 'Log' in them.
+    # Use this to determine if we need to redirect the query to the blockchain mgr instead of the FHIR server
+    if 'Log' in queryString:
+        print('redirecting to blockchain')
+        queryURL = BLOCKCHAIN_HOST
+    else:
+        queryURL = cmDict['FHIR_SERVER']
     print('queryURL = ' + queryURL)
     params = ''
  #   auth = (fhir_user, fhir_pw)
@@ -303,18 +311,18 @@ def apply_policy(jsonList, policies, origFHIR):
             consentDF = pd.json_normalize(consentTuple[0])
 
             end_consentList = []
-            # if the subject.reference is not in the Consent table, then this needs to be redacted
-            consentMissingDF = df.loc[~df['subject.reference'].isin(consentDF['patient.reference'])]
             # Add a new column to the consentDF df which is "end_date" and is in timestamp format
             for index in consentDF.index:
                 end_consentList.append(datetime.strptime(consentDF['provision.provision'][index][0]['period']['end'], '%Y-%m-%dT%H:%M:%S%z'))
             print('end_consentList = ' + str(end_consentList))
             consentDF['end_consent'] = end_consentList
- #               consentDF['end_consent'][index] = datetime.strptime(consentDF['provision.provision'][index][0]['period']['end'], '%Y-%m-%dT%H:%M:%S%z')
-            outOfTimePeriodDF = len(df.loc[df['subject.reference'].isin(consentDF['patient.reference'])]) > 0 and \
-                consentDF.loc[consentDF['end_consent']  > current_timestamp]
-            inTimePeriodDF = len(df.loc[df['subject.reference'].isin(consentDF['patient.reference'])]) > 0 and \
-                consentDF.loc[consentDF['end_consent']  <= current_timestamp]
+            print('consentDF["patient.reference"] = ' + str(consentDF['patient.reference']))
+            print('df[subject.reference] = ' + str(df['subject.reference']))
+            # Now, drop all entries where the consent has expired
+            cleanedConsentDF = consentDF[consentDF['end_consent'] >= current_timestamp]
+            outOfTimePeriodDF = df.loc[~df['subject.reference'].isin(cleanedConsentDF['patient.reference'])]
+            inTimePeriodDF = df.loc[df['subject.reference'].isin(cleanedConsentDF['patient.reference'])]
+
   # Redact the dataframes for outOfTimePeriodDF and consentMissingDF and then append these results to the unredacted inTimePeriodDF
 
             replacementStr = policy['options']['redactValue']
@@ -324,16 +332,17 @@ def apply_policy(jsonList, policies, origFHIR):
                     # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
                     # before replacing
                     #              df[col].replace(r'.+', replacementStr, regex=True, inplace=True)
-                    outOfTimePeriodDF[col] = outOfTimePeriodDF[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
-                    consentMissingDF[col] = consentMissingDF[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
+                    if not outOfTimePeriodDF.empty:
+                        outOfTimePeriodDF[col] = outOfTimePeriodDF[col].astype(str).str.replace(r'.+', replacementStr, regex=True)
                 except:
                     print("No such column " + col + " to redact")
+                    if not outOfTimePeriodDF.empty:
+                        print('available columns (outOfTimePeriodDF) = ' + str(outOfTimePeriodDF.keys()))
+
             for i in outOfTimePeriodDF.index:
                 dfToRows.append(outOfTimePeriodDF.loc[i].to_json())
-            for i in consentMissingDF.index:
-                dfToRows.append(consentMissingDF.loc[i].to_json())
-            for i in consentMissingDF.index:
-                dfToRows.append(consentMissingDF.loc[i].to_json())
+            for i in inTimePeriodDF.index:
+                dfToRows.append(inTimePeriodDF.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
             print('JoinAndRedact about to return ' + str(jsonList))
             return str(jsonList), VALID_RETURN
