@@ -27,6 +27,4 @@ spec:
       - name: subject.reference
         tags:
           PII: true
-      - name: patient.reference
-        tags:
-          PII: true
+
