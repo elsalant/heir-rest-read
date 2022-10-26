@@ -30,7 +30,7 @@ ERROR_CODE = 406
 BLOCK_CODE = 501
 VALID_RETURN = 200
 
-TEST = False   # allows testing outside of Fybrik/Kubernetes environment
+TEST = False  # allows testing outside of Fybrik/Kubernetes environment
 logger = logging.getLogger(__name__)
 
 if TEST:
@@ -324,8 +324,10 @@ def apply_policy(jsonList, policies, origFHIR):
             inTimePeriodDF = df.loc[df['subject.reference'].isin(cleanedConsentDF['patient.reference'])]
 
   # Redact the dataframes for outOfTimePeriodDF and consentMissingDF and then append these results to the unredacted inTimePeriodDF
-
-            replacementStr = policy['options']['redactValue']
+            if  not TEST:
+                replacementStr = policy['options']['redactValue']
+            else:
+                replacementStr = 'XXXX'
             for col in policy['columns']:
                 print('trying to replace ' + col + ' with ' + replacementStr + ' in df: ')
                 try:
@@ -456,6 +458,11 @@ def getAll(queryString=None):
             print("Error: no role in JWT!")
             role = 'ERROR NO ROLE!'
         try:
+            intent = decryptJWT(payloadEncrypted, 'Intent')
+        except:
+            print("Error: no Intent in JWT!")
+            intent = 'ERROR NO INTENT!'
+        try:
             givenName = decryptJWT(payloadEncrypted, 'GivenName')
             surName = decryptJWT(payloadEncrypted, 'Surname')
         except:
@@ -471,7 +478,7 @@ def getAll(queryString=None):
         role = 'ERROR NO ROLE!'
     if (organization == None):
         organization = 'NO ORGANIZATION'
-    print('Surname = ' + surName + ' GivenName = ' + givenName + ' role = ', role, " organization = ", organization)
+    print('Surname = ' + surName + ' GivenName = ' + givenName + ' role = '+ role + ' organization = ' + organization + ' Intent = ' + intent)
 #   Role in JWT needs to match role of requestor from original FybrikApplication deployment
     requester = checkRequester()  # from the FybrikApplication
     timeOut = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -568,6 +575,10 @@ def main():
     if TEST:
         cmDict = {'SUBMITTER': 'EliotSalant', 'assetID': 'test1', 'SECRET_NSPACE': 'rest-fhir',
           'SECRET_FNAME': 'fhir-credentials', 'FHIR_SERVER' : 'https://localhost:9443/fhir-server/api/v4/', 'transformations': [
+                {'action': 'JoinAndRedact', 'joinTable': 'Consent',
+                            'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
+                            'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference ',
+                            'columns': ['id', 'subject.reference', 'subject.display']},
         {'action': 'BlockResource', 'description': 'Block all data for resource: [subject.reference]',
          'columns': ['subject.reference']},
         {'action': 'JoinResource', 'description': 'Perform a JOIN', 'joinTable': 'Consent',
