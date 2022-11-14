@@ -517,11 +517,11 @@ def getAll(queryString=None):
                 intent = i['intent']
     if (queryRequester != requester):
         print("queryRequester " + queryRequester + " != " + requester)
-        jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + queryRequester + '\", \"Query\": \"' + queryString + \
+        jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + str(queryRequester) + '\", \"Query\": \"' + str(queryString) + \
                     '\", \"ClientIP\": \"' + str(request.remote_addr) + '\",' + \
-                  '\"assetID": \"' + assetID + '\",' + \
+                  '\"assetID": \"' + str(assetID) + '\",' + \
                   '\"policyDecision\": \"' + str(cmDict['transformations']) + '\",' + \
-                    '"intent\": \"' + intent +'\", \"Outcome": \"UNAUTHORIZED\"}'
+                    '"intent\": \"' + str(intent) +'\", \"Outcome": \"UNAUTHORIZED\"}'
         logToKafka(jSONout, kafka_topic)
         return ("{\"Error\": \"Unauthorized access attempt!\"}")
 
