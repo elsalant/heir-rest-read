@@ -96,6 +96,8 @@ data:
   - action: "RedactColumn"
     description: "redact columns: {{ $redactColumns }}"
     intent: {{ .RedactColumn.intent }}
+    noredact-role: {{.RedactColumn.noredact}}
+
     columns:
 {{- range $redactColumns}}
       - {{ . }}

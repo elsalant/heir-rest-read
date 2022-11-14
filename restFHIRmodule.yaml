@@ -25,10 +25,13 @@ spec:
         - source:
             protocol: fhir
             dataformat: json
+        - source:
+            protocol: blockchain
+            dataformat: json
   chart:
     name: ghcr.io/fybrik/fhir-read-chart:0.0.1
     values:
-      image.tag: 0.0.1
+      image.tag: blockchain
   statusIndicators:
     - kind: StreamTransfer
       successCondition: status.status == SUCCEEDED

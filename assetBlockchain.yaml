@@ -1,0 +1,29 @@
+apiVersion: katalog.fybrik.io/v1alpha1
+kind: Asset
+metadata:
+  name: blockchain-json
+  namespace: rest-fhir
+spec:
+  details:
+    dataFormat: json
+    connection:
+      name: blockchain
+      blockchain:
+        fhirServer: 'http://heirauditclient.heirauditingmechanism'
+        port: 8081
+        namespace: rest-fhir
+        secretRef: blockchain-credentials
+  secretRef:
+      name: blockchain-credentials
+  metadata:
+    name: blockchain
+    geography: Norway
+    tags:
+      blockchain: true
+    columns:
+      - name: userID
+        tags:
+          PII: true
+      - name: clientIP
+        tags:
+          PII: true

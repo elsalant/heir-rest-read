@@ -16,3 +16,5 @@ spec:
   data:
     - dataSetID: "rest-fhir/observation-json"
       requirements: {}
+    - dataSetID: "rest-fhir/blockchain-json"
+      requirements: {}

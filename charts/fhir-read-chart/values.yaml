@@ -6,7 +6,7 @@ replicaCount: 1
 
 image: 
   repository:  ghcr.io/fybrik/fhir-read-module
-  tag: 0.0.1
+  tag: blockchain
   pullPolicy: Always
   pullSecret: null
 

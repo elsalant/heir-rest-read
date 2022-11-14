@@ -150,9 +150,11 @@ def read_from_fhir(queryString):
 #    queryURL = fhir_host or blockchain host, depending on the original URL
     # This is sort of a hack - nearly all the calls to the blockchain contain 'Log' in them.
     # Use this to determine if we need to redirect the query to the blockchain mgr instead of the FHIR server
+    blockchainQuery = False
     if 'Log' in queryString:
         print('redirecting to blockchain')
         queryURL = BLOCKCHAIN_HOST
+        blockchainQuery = True
     else:
         queryURL = cmDict['FHIR_SERVER']
     print('queryURL = ' + queryURL)
@@ -165,6 +167,8 @@ def read_from_fhir(queryString):
         return(['{"ERROR" : "returnedRecord empty!"}'], ERROR_CODE)
     # Strip the bundle information out and convert to data frame
     recordList = []
+    if blockchainQuery == True:
+        return(returnedRecord, VALID_RETURN)
     try:
         for record in returnedRecord['entry']:
             print("bundle detected")
@@ -212,8 +216,10 @@ def redactEntry(dfLine, df):
 
 # Pass in the data to be redacted as jsonList, along with the redaction policies
 # origFHIR is required if we are doing a JOIN, as we need to translate this to SQL
-def apply_policy(jsonList, policies, origFHIR):
+def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
     df = pd.json_normalize(jsonList)
+    print('In apply_policy, df.keys = ')
+    print(df)
     redactedData = []
     # Redact df based on policy returned from the policy manager
     meanStr = ''
@@ -239,6 +245,8 @@ def apply_policy(jsonList, policies, origFHIR):
     for policy in policies['transformations']:
         action = policy['action']
         print('Action = ' + action)
+        print('policy = ')
+        print(policy)
         if action == '':
             return (str(df.to_json()), VALID_RETURN)
 
@@ -262,6 +270,9 @@ def apply_policy(jsonList, policies, origFHIR):
             continue
 
         elif action == 'RedactColumn':
+            if role.lower() == policy['noredact-role'].lower():   # hack for blockchain
+                print('RedactColumn: no redaction being done!')
+                continue
             replacementStr = policy['options']['redactValue']
             for col in policy['columns']:
                 # Flattening the FHIR means that an attribute may now appears with one or more '.', so the following
@@ -286,8 +297,9 @@ def apply_policy(jsonList, policies, origFHIR):
             for i in df.index:
                 dfToRows.append(df.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
- #           return (jsonList, VALID_RETURN)
-            continue
+            df = pd.json_normalize(jsonList)
+            return str(jsonList), VALID_RETURN
+ #           continue
 
         if action == 'BlockResource':
         #    if policy['transformations'][0]['columns'][0] == df['resourceType'][0]:
@@ -301,13 +313,15 @@ def apply_policy(jsonList, policies, origFHIR):
         # If there is no consent for an individual patient record (row), redact all PII from the row,
         # else reveal all
         if action == 'JoinAndRedact':
+            if blockChainCall == True:   # hack for blockchain support
+                continue
             current_timestamp = datetime.now(timezone.utc)
             whereclause = policy['whereclause']
             joinTable = policy['joinTable']
             # Call in to FHIR to get the join resource (i.e. 'Consent'), and put the results into a df.
             # The passed 'joinTable' value must be the name of the FHIR resource
             joinQuery = joinTable
-            consentTuple = read_from_fhir(joinQuery)
+            consentTuple, status = read_from_fhir(joinQuery)
             consentDF = pd.json_normalize(consentTuple[0])
 
             end_consentList = []
@@ -358,6 +372,8 @@ def apply_policy(jsonList, policies, origFHIR):
         # 5. Execute an SQL query on this new query
         # 6. Handle redactions
         if action == 'JoinResource':
+            if blockChainCall == True:  # hack for blockchain support
+                continue
             whereclause = policy['whereclause']
             joinclause = policy['joinStatement']
             joinTable = policy['joinTable']
@@ -368,7 +384,7 @@ def apply_policy(jsonList, policies, origFHIR):
             # Call in to FHIR to get the join resource values, and put the results into a table.
             # The passed 'joinTable' value must be the name of the FHIR resource
             joinQuery = joinTable
-            joinJSON = read_from_fhir(joinQuery)
+            joinJSON, status = read_from_fhir(joinQuery)
             logger.info('building JOIN table of name' + joinTable)
             sqlUtils.buildSQLtableFromJson(joinJSON[0], joinTable)
             # The original FHIR query already applied any selection criteria.  We can therefore do a
@@ -423,7 +439,7 @@ def apply_policy(jsonList, policies, origFHIR):
             return(str(d), VALID_RETURN)
         else:
             return('{"Unknown transformation": "'+ action + '"}', ERROR_CODE)
-    print("after redaction, returning " + str(df.to_json()))
+#    print("after redaction, returning " + str(df.to_json()))
     return (str(df.to_json()), VALID_RETURN)
 
 def timeWindow_filter(df):
@@ -440,7 +456,10 @@ def getAll(queryString=None):
     global cmDict
     print("queryString = " + queryString)
     print('request.url = ' + request.url)
-
+    if 'Log' in request.url:
+        blockchainRequest = True   # hack required to avoid policy mean for consent
+    else:
+        blockchainRequest = False
 # Handle authentication in the header
     noJWT = True
     payloadEncrypted = request.headers.get('Authorization')
@@ -512,7 +531,7 @@ def getAll(queryString=None):
     if (messageCode != VALID_RETURN):
         return ("{\"Error\": \"No information returned!\"}")
 #apply_policies
-    ans, messageCode = apply_policy(dfBack, cmDict, queryString)
+    ans, messageCode = apply_policy(dfBack, cmDict, queryString, role, blockchainRequest)
     if messageCode == VALID_RETURN:
         outcome = "AUTHORIZED"
     elif messageCode == BLOCK_CODE:
@@ -525,13 +544,13 @@ def getAll(queryString=None):
     print('policyDecision before = '+str(cmDict['transformations']))
     policyDecision = str(cmDict['transformations']).replace("\"", "\'")
     print('policyDecision afte r= '+policyDecision)
-    jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + requester + '\", \"Query\": \"' + queryString + '\",' + \
+    jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + str(requester) + '\", \"Query\": \"' + str(queryString) + '\",' + \
               '\"ClientIP\": \"' + str(request.remote_addr) + '\",' + \
-              '\"assetID": \"' + assetID + '\",' + \
-              '\"policyDecision\": \"'  + policyDecision + '\",' + \
-              '\"intent\": \"' + intent + '\",\"Outcome": \"' + outcome + '\"}'
+              '\"assetID": \"' + str(assetID) + '\",' + \
+              '\"policyDecision\": \"'  + str(policyDecision) + '\",' + \
+              '\"intent\": \"' + str(intent) + '\",\"Outcome": \"' + str(outcome) + '\"}'
     logToKafka(jSONout, kafka_topic)
-    print('ans = '+ str(ans))
+ #   print('ans = '+ str(ans))
     return(ans)
  #   return (json.dumps(ans))
 
