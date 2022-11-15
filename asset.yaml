@@ -16,7 +16,7 @@ spec:
   secretRef:
       name: fhir-credentials
   metadata:
-    name: consent
+    name: observation
     geography: UK
     tags:
       healthcare: true

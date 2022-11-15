@@ -1,6 +1,6 @@
-app-uuid: {{ .Values.uuid | default "app-uuid-missing" }}
-{{ if .Values.assets -}}
-data:
+  app-uuid: {{ .Values.uuid | default "app-uuid-missing" }}
+  {{ if .Values.assets -}}
+  data:
 {{ if .Values.labels }}
     SUBMITTER: {{ get .Values.labels "requestedBy" | default "requester-missing" }}
 {{- end }}
