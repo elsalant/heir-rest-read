@@ -16,7 +16,7 @@ spec:
   secretRef:
       name: fhir-credentials
   metadata:
-    name: FHIR server
+    name: consent
     geography: UK
     tags:
       healthcare: true

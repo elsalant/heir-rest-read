@@ -315,6 +315,19 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
         if action == 'JoinAndRedact':
             if blockChainCall == True:   # hack for blockchain support
                 continue
+            ###
+            joinedJSON = sqlJoin(policy, jsonList, origFHIR)
+            print('df.keys() = ', df.keys())
+            inTimePeriodDF = pd.json_normalize(joinedJSON)
+            print('inTimePeriodDF.keys() = '+ inTimePeriodDF.keys())
+            if inTimePeriodDF.size:
+                outOfTimePeriodDF = df.loc[~df['id'].isin(inTimePeriodDF['id'])]
+            else:
+                outOfTimePeriodDF = []
+            print('outOfTimePeriodDF.size = '+str(outOfTimePeriodDF.size))
+            print('inTimePeriodDF.size = ' + str(inTimePeriodDF.size))
+            print('df.size = ' + str(df.size))
+            '''
             current_timestamp = datetime.now(timezone.utc)
             whereclause = policy['whereclause']
             joinTable = policy['joinTable']
@@ -336,8 +349,8 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
             cleanedConsentDF = consentDF[consentDF['end_consent'] >= current_timestamp]
             outOfTimePeriodDF = df.loc[~df['subject.reference'].isin(cleanedConsentDF['patient.reference'])]
             inTimePeriodDF = df.loc[df['subject.reference'].isin(cleanedConsentDF['patient.reference'])]
-
-  # Redact the dataframes for outOfTimePeriodDF and consentMissingDF and then append these results to the unredacted inTimePeriodDF
+            '''
+  # Redact the dataframes for outOfTimePeriodDF and then append these results to the unredacted inTimePeriodDF
             if  not TEST:
                 replacementStr = policy['options']['redactValue']
             else:
@@ -374,6 +387,8 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
         if action == 'JoinResource':
             if blockChainCall == True:  # hack for blockchain support
                 continue
+            joinedJSON = sqlJoin(policy, jsonList, origFHIR)
+            '''
             whereclause = policy['whereclause']
             joinclause = policy['joinStatement']
             joinTable = policy['joinTable']
@@ -395,6 +410,7 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
             joinedJSON = sqlUtils.querySQL(joinQuery)
             # If we still have other transformation actions to handle - i.e. more than one transform in policies,
             #  reset the original df and continue
+            '''
             if len(policies['transformations']) > 1:
                 df = pd.json_normalize(joinedJSON)
                 continue
@@ -447,6 +463,40 @@ def timeWindow_filter(df):
     # drop rows that are outside of the timeframe
     df.drop(df.loc[(pd.to_datetime(df['effectivePeriod.start'], utc=True) + timedelta(days=time_window) < datetime.now(timezone.utc)) | (df['resourceType'] != 'Observation')].index, inplace=True)
     return df
+
+def sqlJoin(policy, resourceList, origFHIR):
+    observationDF = pd.json_normalize(resourceList)
+    whereclause = policy['whereclause']
+    joinclause = policy['joinStatement']
+    joinTable = policy['joinTable']
+    # Give the name the same name as the requested resource
+    tableName = observationDF['resourceType'][0]
+    logger.info('building table of name' + tableName)
+    print('resourceList = ', str(resourceList))
+    sqlUtils.buildSQLtableFromJson(resourceList, 'Observation')
+    # Call in to FHIR to get the join resource values, and put the results into a table.
+    # The passed 'joinTable' value must be the name of the FHIR resource
+    joinQuery = joinTable
+    joinJSON, status = read_from_fhir(joinQuery)
+    print('status = ', str(status))
+    print('joinJSON = ', str(joinJSON))
+    logger.info('building JOIN table of name' + joinTable)
+    sqlUtils.buildSQLtableFromJson(joinJSON, joinTable)
+    # The original FHIR query already applied any selection criteria.  We can therefore do a
+    # SELECT * on the returned data stored in the temporary view
+    # No need to do anything with the returned aliasDict, since the original query is FHIR without aliasing
+    origSQL = sqlUtils.fhirToSQL(origFHIR)
+    joinQuery, aliasDict = sqlUtils.reformulateQuery(origSQL, whereclause, joinclause)
+    joinedJSON = sqlUtils.querySQL(joinQuery)
+    print('sqlJoin: joinedJSON = ')
+    print(joinedJSON)
+    # If we still have other transformation actions to handle - i.e. more than one transform in policies,
+    #  reset the original df and continue
+#    if len(policies['transformations']) > 1:
+#        df = pd.json_normalize(joinedJSON)
+#        continue
+#    else:
+    return (joinedJSON)
 
 # @app.route('/query/<queryString>')
 # def query(queryString):
