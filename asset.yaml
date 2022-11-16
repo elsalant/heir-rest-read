@@ -19,7 +19,7 @@ spec:
     name: observation
     geography: UK
     tags:
-      healthcare: true
+      observation: true
     columns:
       - name: id
         tags:

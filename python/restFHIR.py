@@ -103,10 +103,10 @@ def handleQuery(queryGatewayURL, queryString, auth, params, method):
     return (returnList)
 
 def checkRequester():
-    if TEST:
-        requester = 'EliotSalant'
-    else:
+    try:
         requester = cmDict['SUBMITTER']
+    except:
+        requester = 'EliotSalant'
     print("SUBMITTER = " + requester)
     return(requester)
 
@@ -356,7 +356,7 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
             else:
                 replacementStr = 'XXXX'
             for col in policy['columns']:
-                print('trying to replace ' + col + ' with ' + replacementStr + ' in df: ')
+                print('trying to replace ' + col + ' with ' + replacementStr + ' in outOfTimePeriod: ')
                 try:
                     # Replace won't replace floats or ints.  Instead, convert to column to be replaced to a string
                     # before replacing
@@ -554,6 +554,7 @@ def getAll(queryString=None):
     # Hack for testing without JWT
     queryRequester = role if noJWT else givenName+surName
     # assetID is used for logging only and may not be supplied
+    print('cmDict = ', str(cmDict))
     if 'assetID' in cmDict:
         assetID = cmDict['assetID']
     else:
@@ -686,8 +687,15 @@ def main():
  #      cmDict = {'dict_item': [('WP2_TOPIC', 'fhir-wp2'), ('HEIR_KAFKA_HOST', 'kafka.fybrik-system:9092'),('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: [id valueQuantity.value]', 'columns': ['id', 'valueQuantity.value'], 'options': {'redactValue': 'XXXXX'}}, {'action': 'Statistics', 'description': 'statistics on columns: [valueQuantity.value]', 'columns': ['valueQuantity.value']}])]}
   #      cmDict = {'dict_items': [('WP2_TOPIC', 'fhir-wp2'), ('HEIR_KAFKA_HOST', 'kafka.fybrik-system:9092'), ('VAULT_SECRET_PATH', None), ('SECRET_NSPACE', 'fybrik-system'), ('SECRET_FNAME', 'credentials-els'), ('S3_URL', 'http://s3.eu.cloud-object-storage.appdomain.cloud'), ('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: [id valueQuantity.value]', 'columns': ['id', 'valueQuantity.value'], 'options': {'redactValue': 'XXXXX'}}, {'action': 'Statistics', 'description': 'statistics on columns: [valueQuantity.value]', 'columns': ['valueQuantity.value']}])]}
     else:
-        cmDict = cmReturn.get('data', [])
-    print("cmDict = ", cmDict)
+        cmList = cmReturn.get('data', [])
+        # We now have a list for each data source
+        # Merge into one dictionary
+ #       cmDict = {cmList[0], cmList[1]}
+ #       for key, value in cmDict.items():
+ #           if key in cmList[0] and key in cmDict[1]:
+  #              cmDict[key] = [value, cmList[1][key]]
+        cmDict = cmList[0]  # Fix this!!
+    print("cmDict = ", str(cmDict))
 
     app.run(port=FLASK_PORT_NUM, host='0.0.0.0')
 

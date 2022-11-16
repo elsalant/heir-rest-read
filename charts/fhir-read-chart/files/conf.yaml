@@ -1,21 +1,18 @@
-  app-uuid: {{ .Values.uuid | default "app-uuid-missing" }}
-  {{ if .Values.assets -}}
-  data:
-{{ if .Values.labels }}
-    SUBMITTER: {{ get .Values.labels "requestedBy" | default "requester-missing" }}
-{{- end }}
+app-uuid: {{ .Values.uuid | default "app-uuid-missing" }}
+{{ if .Values.assets -}}
+data:
 {{- range $asset := .Values.assets }}
   - name: {{ $asset.assetID | quote }}
   {{- if and (.args) (eq (len .args) 1) -}}
   {{- with (index .args 0) }}
     {{- if index . "connection" "kafka" }}
-        WP2_TOPIC: {{ index . "connection" "kafka" "topic_name" }}
-        HEIR_KAFKA_HOST: {{ index . "connection" "kafka" "bootstrap_servers" }}
+    WP2_TOPIC: {{ index . "connection" "kafka" "topic_name" }}
+    HEIR_KAFKA_HOST: {{ index . "connection" "kafka" "bootstrap_servers" }}
     {{- end }}
     {{- if index . "connection" "fhir" }}
-        SECRET_NSPACE: {{ index . "connection" "fhir" "namespace" }}
-        SECRET_FNAME: {{ index . "connection" "fhir" "secretRef" }}
-        FHIR_SERVER: {{ index . "connection" "fhir" "fhirServer" }}
+    SECRET_NSPACE: {{ index . "connection" "fhir" "namespace" }}
+    SECRET_FNAME: {{ index . "connection" "fhir" "secretRef" }}
+    FHIR_SERVER: {{ index . "connection" "fhir" "fhirServer" }}
     {{- end }}
   {{- end }}
   {{- end }}
