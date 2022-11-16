@@ -142,21 +142,24 @@ def getSecretKeysExample(secret_name, secret_namespace):  # Not needed here.  Ma
     return(accessKeyID.decode('ascii'), secretAccessKey.decode('ascii'))
 
 def read_from_fhir(queryString):
-    if TEST:
-        fhiruser = fhir_user
-        fhirpw = DEFAULT_FHIR_PW
-    else:
-        fhiruser, fhirpw = getSecretKeys()
 #    queryURL = fhir_host or blockchain host, depending on the original URL
     # This is sort of a hack - nearly all the calls to the blockchain contain 'Log' in them.
     # Use this to determine if we need to redirect the query to the blockchain mgr instead of the FHIR server
     blockchainQuery = False
+    print('read_from_fhir - cmDict = ')
+    print(cmDict)
     if 'Log' in queryString:
         print('redirecting to blockchain')
         queryURL = BLOCKCHAIN_HOST
         blockchainQuery = True
     else:
         queryURL = cmDict['FHIR_SERVER']
+    if TEST:
+        fhiruser = fhir_user
+        fhirpw = DEFAULT_FHIR_PW
+    else:
+        if ~blockchainQuery:
+            fhiruser, fhirpw = getSecretKeys()
     print('queryURL = ' + queryURL)
     params = ''
  #   auth = (fhir_user, fhir_pw)
@@ -186,14 +189,18 @@ def getSecretKeys():
     except:
         config.load_kube_config()   # useful for testing outside of k8s
     v1 = client.CoreV1Api()
-    secret_namespace = cmDict['SECRET_NSPACE']
-    secret_fname = cmDict['SECRET_FNAME']
-    print("secret_fname = " + secret_fname + " secret_namespace = " + secret_namespace)
-    secret = v1.read_namespaced_secret(secret_fname, secret_namespace)
-    fhiruser = base64.b64decode(secret.data['fhiruser'])
-    fhirpw = base64.b64decode(secret.data['fhirpasswd'])
-    print('getSecretKeys: fhiruser = ' + fhiruser.decode('ascii') + ' fhirpw = ' + fhirpw.decode('ascii'))
-    return(fhiruser.decode('ascii'), fhirpw.decode('ascii'), )
+    try:
+        secret_namespace = cmDict['SECRET_NSPACE']
+        secret_fname = cmDict['SECRET_FNAME']
+        print("secret_fname = " + secret_fname + " secret_namespace = " + secret_namespace)
+        secret = v1.read_namespaced_secret(secret_fname, secret_namespace)
+        fhiruser = base64.b64decode(secret.data['fhiruser'])
+        fhirpw = base64.b64decode(secret.data['fhirpasswd'])
+        print('getSecretKeys: fhiruser = ' + fhiruser.decode('ascii') + ' fhirpw = ' + fhirpw.decode('ascii'))
+        return(fhiruser.decode('ascii'), fhirpw.decode('ascii'), )
+    except:
+        print('getSecretKeys failed!')
+        return('N/A','N/A')
 
 def connect_to_kafka():
     global kafkaDisabled
@@ -503,6 +510,7 @@ def sqlJoin(policy, resourceList, origFHIR):
 # Catch anything
 @app.route('/<path:queryString>',methods=['GET', 'POST', 'PUT'])
 def getAll(queryString=None):
+    global cmList
     global cmDict
     print("queryString = " + queryString)
     print('request.url = ' + request.url)
@@ -554,6 +562,17 @@ def getAll(queryString=None):
     # Hack for testing without JWT
     queryRequester = role if noJWT else givenName+surName
     # assetID is used for logging only and may not be supplied
+    # cmList now contains a list of dictionaries, one dictionary for each asset
+    # As a semi-hack, for blockchain, use the dictionary associated with the asset in the rest-blockchain namespace
+    if blockchainRequest:
+        for dict in cmList:
+            if 'rest-blockchain' in dict['name']:
+                cmDict = dict
+    else:
+        for dict in cmList:
+            if 'rest-fhir' in dict['name']:
+                cmDict = dict
+
     print('cmDict = ', str(cmDict))
     if 'assetID' in cmDict:
         assetID = cmDict['assetID']
@@ -621,7 +640,8 @@ def logToKafka(jString, kafka_topic):
         print(e)
 
 def main():
-    global cmDict
+#    global cmDict
+    global cmList
     global kafkaDisabled
     kafkaDisabled = True
     global producer
@@ -688,14 +708,15 @@ def main():
   #      cmDict = {'dict_items': [('WP2_TOPIC', 'fhir-wp2'), ('HEIR_KAFKA_HOST', 'kafka.fybrik-system:9092'), ('VAULT_SECRET_PATH', None), ('SECRET_NSPACE', 'fybrik-system'), ('SECRET_FNAME', 'credentials-els'), ('S3_URL', 'http://s3.eu.cloud-object-storage.appdomain.cloud'), ('transformations', [{'action': 'RedactColumn', 'description': 'redacting columns: [id valueQuantity.value]', 'columns': ['id', 'valueQuantity.value'], 'options': {'redactValue': 'XXXXX'}}, {'action': 'Statistics', 'description': 'statistics on columns: [valueQuantity.value]', 'columns': ['valueQuantity.value']}])]}
     else:
         cmList = cmReturn.get('data', [])
+        print('length of cmList = ' + str(len(cmList)))
         # We now have a list for each data source
         # Merge into one dictionary
  #       cmDict = {cmList[0], cmList[1]}
  #       for key, value in cmDict.items():
  #           if key in cmList[0] and key in cmDict[1]:
   #              cmDict[key] = [value, cmList[1][key]]
-        cmDict = cmList[0]  # Fix this!!
-    print("cmDict = ", str(cmDict))
+ #       cmDict = cmList[0]  # Fix this!!
+ #   print("cmDict = ", str(cmDict))
 
     app.run(port=FLASK_PORT_NUM, host='0.0.0.0')
 

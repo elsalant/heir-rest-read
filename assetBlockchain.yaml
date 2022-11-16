@@ -2,7 +2,7 @@ apiVersion: katalog.fybrik.io/v1alpha1
 kind: Asset
 metadata:
   name: blockchain-json
-  namespace: rest-fhir
+  namespace: rest-blockchain
 spec:
   details:
     dataFormat: json
@@ -11,7 +11,7 @@ spec:
       blockchain:
         fhirServer: 'http://heirauditclient.heirauditingmechanism'
         port: 8081
-        namespace: rest-fhir
+        namespace: rest-blockchain
         secretRef: blockchain-credentials
   secretRef:
       name: blockchain-credentials

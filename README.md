@@ -28,8 +28,10 @@ helm install kafka bitnami/kafka --set externalAccess.enabled=true --set externa
  
 Then, expose port 9094 on the Kubernetes cluster with the command:
 kubectl port-forward service/kafka-0-external  9094:9094  
-5. Create a namespace for the demo:  
+5. Create namespaces for the different assets: 
 kubectl create namespace rest-fhir  
+kubectl create namespace rest-blockchain
+NOTE:  blockchain requests will only be applied on resources from the rest-blockchain namespace!
 6. Pull the files:  
 git pull https://github.com/fybrik/REST-read-example.git  
 7. Install the policy:  
