@@ -305,7 +305,9 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
                 dfToRows.append(df.loc[i].to_json())
             jsonList = [json.loads(x) for x in dfToRows]
             df = pd.json_normalize(jsonList)
-            return str(jsonList), VALID_RETURN
+            jsonOut = df.to_json()   # change single quotes to double quotes
+            return(str(jsonOut), VALID_RETURN)
+ #           return str(jsonList).replace('\'', '\"' ), VALID_RETURN
  #           continue
 
         if action == 'BlockResource':
