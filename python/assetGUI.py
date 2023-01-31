@@ -1,26 +1,66 @@
 import yaml
-import json
+from kubernetes import client, config
 import os
 import PySimpleGUI as sg
 
 def main():
-    ASSET_FILE = os.getenv("ASSET_FILE") if os.getenv("ASSET_FILE") else "/Users/eliot/projects/HEIR/code/heir-2dhalf/heir-rest-read/asset.yaml"
-    with open(ASSET_FILE, "r") as file:
-        yaml_data = yaml.safe_load(file)
-    attribList = yaml_data['spec']['metadata']['columns']
-    createGUI(attribList)
-    yaml_data['spec']['metadata']['columns'] = attribList
-    update_yamlfile(yaml_data, ASSET_FILE)
-    os.system('kubectl apply -f '+ASSET_FILE)
+    api_client = initializeKubernetesClient()
+    assets = getAllAssets(api_client,GROUP,VERSION,NAMESPACE,PLURAL)
+    print('number of assets = ' + str(len(assets))+ ' '+str(assets))
+    assetLine = []
+    for asset in assets:
+        assetName = asset['metadata']['name']
+        assetData= getAssetYAML(api_client,GROUP,VERSION,NAMESPACE,PLURAL,assetName)
+        yaml_data = yaml.safe_load(assetData)
+        attribList = yaml_data['spec']['metadata']['columns']
+        createGUI(assetLine, attribList)
+        yaml_data['spec']['metadata']['columns'] = attribList
+        updateAsset(api_client, yaml_data)
+ #       update_yamlfile(yaml_data, assetName)
+        os.system('kubectl apply -f '+ assetName)
 
+def updateAsset(api_client, yaml_data):
+    api_client.patch_namespaced_custom_object(
+        GROUP, VERSION, NAMESPACE, PLURAL,
+        yaml_data["metadata"]["name"],
+        yaml_data
+    )
+    
 def update_yamlfile(yaml_data, ASSET_FILE):
     ff = open(ASSET_FILE, "w+")
     yaml.dump(yaml_data, ff)
     ff.close()
 
-def createGUI(attribList):
+def initializeKubernetesClient():
+    config.load_kube_config()
+    api_client = client.CustomObjectsApi()
+    return(api_client)
+
+def getAllAssets(api_client, group, version, namespace, plural):
+    resources = api_client.list_namespaced_custom_object(
+        group,
+        version,
+        namespace,
+        plural
+    )
+    return (resources['items'])
+
+def getAssetYAML(api_client, group, version, namespace, plural, assetName):
+    # Get the details of the CRD
+    crd = api_client.get_namespaced_custom_object(
+        group,
+        version,
+        namespace,
+        plural,
+        assetName
+    )
+
+    # Convert the CRD to YAML
+    crd_yaml = yaml.safe_dump(crd, default_flow_style=False)
+    return (crd_yaml)
+
+def createGUI(assetNames, attribList):
     font = ("Arial", 18)
-    assetNames = []
     for entry in attribList:
         assetNames.append(entry['name']+' : '+str(entry['tags']['PII']))
     attribute_list_column = [
@@ -55,6 +95,10 @@ def createGUI(attribList):
 
     window.close()
 
-
 if __name__ == "__main__":
+    GROUP = "katalog.fybrik.io"
+    VERSION = "v1alpha1"
+    PLURAL = "assets"
+    NAMESPACE = os.getenv("ASSET_NAMESPACE") if os.getenv("ASSET_NAMESPACE") else 'rest-fhir'
+
     main()
