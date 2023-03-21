@@ -175,7 +175,7 @@ def read_from_fhir(queryString):
     try:
         for record in returnedRecord['entry']:
             print("bundle detected")
-            recordList.append(json.dumps(record['resource']))
+            recordList.append(json.dumps(record['resource'], indent=2))
     except:
         print("no information returned!")
         return(['{"ERROR" : "No information returned!"}'], ERROR_CODE)
@@ -381,7 +381,7 @@ def apply_policy(jsonList, policies, origFHIR, role, blockChainCall):
                 dfToRows.append(outOfTimePeriodDF.loc[i].to_json())
             for i in inTimePeriodDF.index:
                 dfToRows.append(inTimePeriodDF.loc[i].to_json())
-            jsonList = [json.loads(x) for x in dfToRows]
+            jsonList = [json.dumps(json.loads(x)) for x in dfToRows]
             print('JoinAndRedact about to return ' + str(jsonList))
             return str(jsonList), VALID_RETURN
 
@@ -527,6 +527,7 @@ def getAll(queryString=None):
     role = None
     givenName = 'None'
     surName = 'None'
+    intent = ''
     if (payloadEncrypted != None):
         noJWT = False
         roleKey = os.getenv("SCHEMA_ROLE") if os.getenv("SCHEMA_ROLE") else FIXED_SCHEMA_ROLE
@@ -574,6 +575,7 @@ def getAll(queryString=None):
         for dict in cmList:
             if 'rest-fhir' in dict['name']:
                 cmDict = dict
+                break
 
     print('cmDict = ', str(cmDict))
     if 'assetID' in cmDict:
@@ -599,7 +601,7 @@ def getAll(queryString=None):
 
     # Go out to the actual FHIR server
     print("request.method = " + request.method)
-    dfBack, messageCode = read_from_fhir(queryString)
+    dfBack, messageCode = read_from_fhir(queryString)  # e.g. get all Observations
     if (messageCode != VALID_RETURN):
         return ("{\"Error\": \"No information returned!\"}")
 #apply_policies
@@ -615,7 +617,7 @@ def getAll(queryString=None):
     # workaround
     print('policyDecision before = '+str(cmDict['transformations']))
     policyDecision = str(cmDict['transformations']).replace("\"", "\'")
-    print('policyDecision afte r= '+policyDecision)
+    print('policyDecision after= '+policyDecision)
     jSONout = '{\"Timestamp\" : \"' + timeOut + '\", \"Requester\": \"' + str(requester) + '\", \"Query\": \"' + str(queryString) + '\",' + \
               '\"ClientIP\": \"' + str(request.remote_addr) + '\",' + \
               '\"assetID": \"' + str(assetID) + '\",' + \
@@ -665,7 +667,7 @@ def main():
             raise ValueError('Error reading from file! ' + CM_PATH)
         print('cmReturn = ', cmReturn)
     if TEST:
-        cmDict = {'SUBMITTER': 'EliotSalant', 'assetID': 'test1', 'SECRET_NSPACE': 'rest-fhir',
+        cmList = [{'SUBMITTER': 'EliotSalant', 'assetID': 'test1', 'SECRET_NSPACE': 'rest-fhir', 'name':'rest-fhir',
           'SECRET_FNAME': 'fhir-credentials', 'FHIR_SERVER' : 'https://localhost:9443/fhir-server/api/v4/', 'transformations': [
                 {'action': 'JoinAndRedact', 'joinTable': 'Consent',
                             'whereclause': ' WHERE consent.provision_provision_0_period_end > CURRENT_TIMESTAMP',
@@ -678,7 +680,7 @@ def main():
          'joinStatement': ' JOIN consent ON observation.subject_reference = consent.patient_reference '},
         {'action': 'RedactColumn', 'description': 'redact columns: [valueQuantity.value subject.reference]',
          'intent': 'research', 'columns': ['valueQuantity.value', 'subject.reference'],
-         'options': {'redactValue': 'XXXXX'}}]}
+         'options': {'redactValue': 'XXXXX'}}]}]
  #       cmDict = {'dict_item': [
  #           ('transformations', [{'action': 'JoinResource', 'description': 'Perform a JOIN on the Consent resource',
  #                                 'joinTable': 'Consent',

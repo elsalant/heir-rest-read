@@ -6,7 +6,7 @@ import PySimpleGUI as sg
 def main():
     api_client = initializeKubernetesClient()
     assets = getAllAssets(api_client,GROUP,VERSION,NAMESPACE,PLURAL)
-    print('number of assets = ' + str(len(assets))+ ' '+str(assets))
+#    print('number of assets = ' + str(len(assets))+ ' '+str(assets))
     assetLine = []
     for asset in assets:
         assetName = asset['metadata']['name']
@@ -25,14 +25,18 @@ def updateAsset(api_client, yaml_data):
         yaml_data["metadata"]["name"],
         yaml_data
     )
-    
+
 def update_yamlfile(yaml_data, ASSET_FILE):
     ff = open(ASSET_FILE, "w+")
     yaml.dump(yaml_data, ff)
     ff.close()
 
 def initializeKubernetesClient():
-    config.load_kube_config()
+    try:
+        config.load_kube_config()
+    except:
+        # Load in-cluster configuration - but the graphics will fail anyway....
+        config.load_incluster_config()
     api_client = client.CustomObjectsApi()
     return(api_client)
 
